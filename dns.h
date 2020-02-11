@@ -8,27 +8,27 @@
  * Response Type
  */
 enum {
-  Ok_ResponseType = 0,
-  FormatError_ResponseType = 1,
-  ServerFailure_ResponseType = 2,
-  NameError_ResponseType = 3,
-  NotImplemented_ResponseType = 4,
-  Refused_ResponseType = 5
+  Response_OK = 0,
+  Response_FormatError = 1,
+  Response_ServerFailure = 2,
+  Response_NameError = 3,
+  Response_NotImplemented = 4,
+  Response_Refused = 5
 };
 
 /**
  * Resource Record Types
  */
 enum {
-  A_Resource_RecordType = 1,
-  NS_Resource_RecordType = 2,
-  CNAME_Resource_RecordType = 5,
-  SOA_Resource_RecordType = 6,
-  PTR_Resource_RecordType = 12,
-  MX_Resource_RecordType = 15,
-  TXT_Resource_RecordType = 16,
-  AAAA_Resource_RecordType = 28,
-  SRV_Resource_RecordType = 33
+  Resource_A = 1,
+  Resource_NS = 2,
+  Resource_CNAME = 5,
+  Resource_SOA = 6,
+  Resource_PTR = 12,
+  Resource_MX = 15,
+  Resource_TXT = 16,
+  Resource_AAAA = 28,
+  Resource_SRV = 33
 };
 
 /**
@@ -54,11 +54,11 @@ enum {
 
 /* Query Type */
 enum {
-  IXFR_QueryType = 251,
-  AXFR_QueryType = 252,
-  MAILB_QueryType = 253,
-  MAILA_QueryType = 254,
-  STAR_QueryType = 255
+  Query_IXFR = 251,
+  Query_AXFR = 252,
+  Query_MAILB = 253,
+  Query_MAILA = 254,
+  Query_STAR = 255
 };
 
 struct Question {
