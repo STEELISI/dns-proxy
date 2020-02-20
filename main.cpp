@@ -1,6 +1,7 @@
 #include <csignal>
 #include <getopt.h>
 #include <iostream>
+#include <signal.h>
 
 #include <dpdk/rte_common.h>
 #include <dpdk/rte_log.h>
@@ -26,15 +27,13 @@
 
 #include "dns.h"
 
-struct kni_port_params {
-  uint8_t port_id;/* Port ID */
-  unsigned lcore_rx; /* lcore ID for RX */
-  unsigned lcore_tx; /* lcore ID for TX */
-  uint32_t nb_lcore_k; /* Number of lcores for KNI multi kernel threads */
-  uint32_t nb_kni; /* Number of KNI devices to be created */
-  unsigned lcore_k[32]; /* lcore ID list for kthreads */
-  struct rte_kni *kni[32]; /* KNI context pointers */
-} __rte_cache_aligned;
+void init_kni() {
+
+}
+
+void init_port(uint16_t port) {
+
+}
 
 /**
  * Handles SIGINT
@@ -65,20 +64,20 @@ int main(int argc, char *argv[]) {
     rte_exit(EXIT_FAILURE, "Could not initialise mbuf pool\n");
 
   // Make sure there's at least one port
-  auto nb_sys_ports = rte_eth_dev_count_avail();
-  if (nb_sys_ports == 0)
+  if (rte_eth_dev_count_avail() == 0)
     rte_exit(EXIT_FAILURE, "No supported Ethernet device found\n");
 
-  // Make sure port exists
-  kni_port_params* params = new kni_port_params;
-  params->nb_kni = 1;
-  params->nb_lcore_k = 2;
-  params->lcore_rx = 2;
-  params->lcore_tx = 4;
+  // Init KNI
+  init_kni();
 
+  // Make sure each port is valid and then init port
+  uint16_t port;
+  RTE_ETH_FOREACH_DEV(port) {
+    if (!rte_eth_dev_is_valid_port(port))
+      rte_exit(EXIT_FAILURE, "Configured invalid port ID %u\n", port);
 
-  if (!rte_eth_dev_is_valid_port(port))
-    rte_exit(EXIT_FAILURE, "Configured invalid port ID %u\n", i);
+    init_port(port);
+  }
 
   return 0;
 }
