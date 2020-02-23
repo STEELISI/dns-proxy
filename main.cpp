@@ -62,6 +62,8 @@
 
 #define KNI_MAX_KTHREAD 32
 
+rte_mempool *pktmbuf_pool = nullptr;
+
 /* Options for configuring ethernet port */
 static struct rte_eth_conf port_conf = {
     .txmode = {
@@ -80,7 +82,10 @@ void init_port(unsigned int port) {
   struct rte_eth_dev_info dev_info;
   int ret = rte_eth_dev_info_get(port, &dev_info);
   if (ret != 0)
-    rte_exit(EXIT_FAILURE, "Error during getting device (port %u) info: %s\n", port, strerror(-ret));
+    rte_exit(EXIT_FAILURE,
+             "Error during getting device (port %u) info: %s\n",
+             port,
+             strerror(-ret));
 
   struct rte_eth_conf local_port_conf = port_conf;
   if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
@@ -92,27 +97,34 @@ void init_port(unsigned int port) {
 
   ret = rte_eth_dev_adjust_nb_rx_tx_desc(port, &nb_rxd, &nb_txd);
   if (ret < 0)
-    rte_exit(EXIT_FAILURE, "Could not adjust number of descriptors for port%u (%d)\n", (unsigned)port, ret);
+    rte_exit(EXIT_FAILURE,
+             "Could not adjust number of descriptors for port%u (%d)\n",
+             (unsigned) port,
+             ret);
 
   struct rte_eth_rxconf rxq_conf = dev_info.default_rxconf;
   rxq_conf.offloads = local_port_conf.rxmode.offloads;
-  ret = rte_eth_rx_queue_setup(port, 0, nb_rxd, rte_eth_dev_socket_id(port), &rxq_conf, pktmbuf_pool);
+  ret =
+      rte_eth_rx_queue_setup(port, 0, nb_rxd, rte_eth_dev_socket_id(port), &rxq_conf, pktmbuf_pool);
   if (ret < 0)
-    rte_exit(EXIT_FAILURE, "Could not setup up RX queue for port%u (%d)\n", (unsigned)port, ret);
+    rte_exit(EXIT_FAILURE, "Could not setup up RX queue for port%u (%d)\n", (unsigned) port, ret);
 
   struct rte_eth_txconf txq_conf = dev_info.default_txconf;
   txq_conf.offloads = local_port_conf.txmode.offloads;
   ret = rte_eth_tx_queue_setup(port, 0, nb_txd, rte_eth_dev_socket_id(port), &txq_conf);
   if (ret < 0)
-    rte_exit(EXIT_FAILURE, "Could not setup up TX queue for port%u (%d)\n", (unsigned)port, ret);
+    rte_exit(EXIT_FAILURE, "Could not setup up TX queue for port%u (%d)\n", (unsigned) port, ret);
 
   ret = rte_eth_dev_start(port);
   if (ret < 0)
-    rte_exit(EXIT_FAILURE, "Could not start port%u (%d)\n", (unsigned)port, ret);
+    rte_exit(EXIT_FAILURE, "Could not start port%u (%d)\n", (unsigned) port, ret);
 
   ret = rte_eth_promiscuous_enable(port);
   if (ret != 0)
-    rte_exit(EXIT_FAILURE,"Could not enable promiscuous mode for port%u: %s\n", port, rte_strerror(-ret));
+    rte_exit(EXIT_FAILURE,
+             "Could not enable promiscuous mode for port%u: %s\n",
+             port,
+             rte_strerror(-ret));
 }
 
 /**
@@ -132,14 +144,17 @@ void handler(int signal) {
 int main(int argc, char *argv[]) {
   signal(SIGINT, handler);
 
+  // Read in input file of valid TLDs
+  insert_tlds("tld.txt");
+
   // Initialize EAL
   int ret = rte_eal_init(argc, argv);
   if (ret < 0)
     rte_exit(EXIT_FAILURE, "Could not initialise EAL (%d)\n", ret);
 
   // Create mubf pool
-  rte_mempool *pktmbuf_pool = rte_pktmbuf_pool_create("mbuf_pool", 131072,
-      32, 0, 4096, rte_socket_id());
+  pktmbuf_pool = rte_pktmbuf_pool_create("mbuf_pool", 131072,
+                                         32, 0, 4096, rte_socket_id());
   if (pktmbuf_pool == nullptr)
     rte_exit(EXIT_FAILURE, "Could not initialise mbuf pool\n");
 
@@ -157,6 +172,14 @@ int main(int argc, char *argv[]) {
       rte_exit(EXIT_FAILURE, "Configured invalid port ID %u\n", port);
 
     init_port(port);
+  }
+
+  while (true) {
+    uint64_t freq = rte_get_timer_hz();
+    uint64_t t = rte_rdtsc() + freq;
+    while (rte_rdtsc() < t) {
+      rte_pause();
+    }
   }
 
   return 0;
