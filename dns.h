@@ -2,69 +2,22 @@
 #define DNS_PROXY__DNS_H
 
 #include <string>
+#include <fstream>
+#include <unordered_set>
 
-// Useful enums (taken from `github.com/ldeng-ustc/netalgo-lab`)
-/**
- * Response Type
- */
-enum {
-  Response_OK = 0,
-  Response_FormatError = 1,
-  Response_ServerFailure = 2,
-  Response_NameError = 3,
-  Response_NotImplemented = 4,
-  Response_Refused = 5
-};
+// Check whether a packet is a standard QUERY
+bool check_if_query(const uint8_t *buffer);
 
-/**
- * Resource Record Types
- */
-enum {
-  Resource_A = 1,
-  Resource_NS = 2,
-  Resource_CNAME = 5,
-  Resource_SOA = 6,
-  Resource_PTR = 12,
-  Resource_MX = 15,
-  Resource_TXT = 16,
-  Resource_AAAA = 28,
-  Resource_SRV = 33
-};
+// Check if a packet is going to have an invalid TLD
+bool check_if_tld_valid(const uint8_t *buffer);
 
-/**
- * OPCODEs
- */
-enum {
-  OPCODE_QUERY = 0, /* standard query */
-  OPCODE_IQUERY = 1, /* inverse query */
-  OPCODE_STATUS = 2, /* server status request */
-  OPCODE_NOTIFY = 4, /* request zone transfer */
-  OPCODE_UPDATE = 5 /* change resource records */
-};
+// Get a domain name from a packet
+std::string get_domain_name(const uint8_t *buffer);
 
-/**
- * RCODEs
- */
-enum {
-  RCODE_NOERROR = 0,
-  RCODE_FORMERR = 1,
-  RCODE_SERVFAIL = 2,
-  RCODE_NXDOMAIN = 3
-};
+// Read valid TLDs from file into valid_tlds
+void insert_tlds(std::string input_file);
 
-/* Query Type */
-enum {
-  Query_IXFR = 251,
-  Query_AXFR = 252,
-  Query_MAILB = 253,
-  Query_MAILA = 254,
-  Query_STAR = 255
-};
-
-struct Question {
-  std::string name;
-  char type;
-  char class_code;
-};
+// Create an NXDOMAIN reply to the packet in the buffer
+uint8_t **create_nxdomain_reply(const uint8_t *buffer);
 
 #endif //DNS_PROXY__DNS_H
