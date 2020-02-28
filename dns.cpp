@@ -19,7 +19,7 @@ bool request_is_query(const uint8_t *buffer) {
   // Read bytes 17-20 and shift back
   auto opcode = (first_16_bits & 0x7800) >> 11;
 
-  // Return if the request is a standard query
+  // Return true if the request is a standard query
   return (opcode == 0x0000);
 }
 
@@ -60,6 +60,7 @@ bool check_if_tld_valid(const uint8_t *buffer) {
 
 uint8_t **create_nxdomain_reply(const uint8_t *buffer) {
   uint8_t *ret_packet;
+  
 
   return &ret_packet;
 }
