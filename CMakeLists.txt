@@ -7,7 +7,9 @@ include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_library(libdns_proxy dns.h dns.cpp)
+add_library(dns_funcs dns.h dns.cpp)
+
+add_library(dpdk_funcs dpdk_addons.h dpdk_addons.cpp)
 
 add_executable(dns_proxy main.cpp)
-target_link_libraries(dns_proxy libdns_proxy ${LIBRARIES})
+target_link_libraries(dns_proxy dns_funcs dpdk_funcs ${LIBRARIES})
