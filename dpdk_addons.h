@@ -44,13 +44,13 @@
 /* Number of RX ring descriptors */
 #define NB_RXD                  1024
 
-/* Number of TX ring descriptors */
+// Number of TX ring descriptors
 #define NB_TXD                  1024
 
-/* Total octets in ethernet header */
+// Total octets in ethernet header
 #define KNI_ENET_HEADER_SIZE    14
 
-/* Total octets in the FCS */
+// Total octets in the FCS
 #define KNI_ENET_FCS_SIZE       4
 
 #define KNI_US_PER_SECOND       1000000
@@ -65,7 +65,17 @@ static struct rte_eth_conf port_conf = {
     },
 };
 
-
+/**
+ * Initialize a physical DPDK port
+ * @param port the port number to init
+ * @param pktmbuf_pool a pointer to the global mempool
+ */
 void init_port(unsigned int port, rte_mempool *pktmbuf_pool);
+
+/**
+ * Transmit data from the KNI port to the NIC
+ * @param port_id the ID of the NIC to transmit to
+ */
+void kni_egress(uint16_t port_id, rte_kni *kni_port);
 
 #endif
