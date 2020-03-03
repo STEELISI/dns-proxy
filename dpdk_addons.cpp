@@ -49,10 +49,36 @@ void init_port(unsigned int port, rte_mempool *pktmbuf_pool) {
     rte_exit(EXIT_FAILURE, "Could not start port%u (%d)\n", (unsigned) port, ret);
 }
 
+rte_kni *init_kni(unsigned int port, uint8_t mac_addr[], rte_mempool *pktmbuf_pool) {
+  rte_kni_conf conf;
+  rte_kni_ops ops;
+  rte_eth_dev_info dev_info;
+
+  // Initialize the KNI
+  rte_kni_init(1);
+
+  // Clear conf and ops
+  memset(&conf, 0, sizeof(conf));
+  memset(&ops, 0, sizeof(ops));
+
+  rte_eth_dev_get_mtu(port, &conf.mtu);
+
+  conf.min_mtu = dev_info.min_mtu;
+  conf.max_mtu = dev_info.max_mtu;
+
+  // Set stuff up
+  ops.port_id = port;
+  ops.change_mtu = reinterpret_cast<int (*)(uint16_t, uint8_t)>(kni_change_mtu());
+  ops.config_network_if = reinterpret_cast<int (*)(uint16_t, uint8_t)>(rte_eth_dev_start(port));
+  ops.config_mac_address = reinterpret_cast<int (*)(uint16_t, uint8_t *)>(rte_eth_dev_default_mac_addr_set(port,
+                                                                                                           (struct rte_ether_addr *) mac_addr));
+
+  return rte_kni_alloc(pktmbuf_pool, &conf, &ops);
+}
+
 void kni_egress(uint16_t port_id, rte_kni *kni_port)
 {
   unsigned nb_tx, num;
-  uint32_t nb_kni;
   struct rte_mbuf *pkts_burst[PKT_BURST_SZ];
 
   // Burst rx from kni

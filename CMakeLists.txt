@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(dns_proxy)
 
+SET(CMAKE_CXX_FLAGS "-mssse3")
 set(LIBRARIES ${LIBRARIES} rt pthread -Wl,--whole-archive dpdk -Wl,--no-whole-archive numa dl)
 find_path(DPDK_INCLUDE_DIR NAMES rte_ethdev.h PATH_SUFFIXES dpdk)
 include_directories(SYSTEM ${DPDK_INCLUDE_DIR})

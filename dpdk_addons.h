@@ -73,8 +73,26 @@ static struct rte_eth_conf port_conf = {
 void init_port(unsigned int port, rte_mempool *pktmbuf_pool);
 
 /**
+ * Change the MTU of a KNI port
+ * @param port port number to change
+ * @param new_mtu new mtu to set
+ * @return success
+ */
+int kni_change_mtu(uint16_t port, unsigned int new_mtu);
+
+/**
+ * Initialize a KNI port
+ * @param port port number to bind to
+ * @param mac_addr mac address to give to port
+ * @param pktmbuf_pool a pointer to the global mempool
+ * @return a KNI context pointer
+ */
+rte_kni *init_kni(unsigned int port, uint8_t mac_addr[], rte_mempool *pktmbuf_pool);
+
+/**
  * Transmit data from the KNI port to the NIC
  * @param port_id the ID of the NIC to transmit to
+ * @param kni_port a KNI context pointer to the port to transfer from
  */
 void kni_egress(uint16_t port_id, rte_kni *kni_port);
 
