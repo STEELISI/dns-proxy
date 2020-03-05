@@ -78,7 +78,7 @@ void init_port(unsigned int port, rte_mempool *pktmbuf_pool);
  * @param new_mtu new mtu to set
  * @return success
  */
-int kni_change_mtu(uint16_t port, unsigned int new_mtu);
+unsigned int kni_change_mtu(uint16_t port, unsigned int new_mtu, rte_mempool *pktmbuf_pool);
 
 /**
  * Initialize a KNI port
