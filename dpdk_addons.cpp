@@ -49,6 +49,38 @@ void init_port(unsigned int port, rte_mempool *pktmbuf_pool) {
     rte_exit(EXIT_FAILURE, "Could not start port%u (%d)\n", (unsigned) port, ret);
 }
 
+unsigned int kni_change_mtu(uint16_t port, unsigned int new_mtu, rte_mempool *pktmbuf_pool) {
+  uint16_t nb_rxd = 1024;
+  rte_eth_conf conf;
+  rte_eth_dev_info dev_info;
+  rte_eth_rxconf rxq_conf;
+
+  // Stop the port
+  rte_eth_dev_stop(port);
+  memcpy(&conf, &port_conf, sizeof(conf));
+
+  // Set new MTU
+  if (new_mtu > RTE_ETHER_MAX_LEN)
+    conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
+  else
+    conf.rxmode.offloads &= ~DEV_RX_OFFLOAD_JUMBO_FRAME;
+
+  // Set up max packet length including headers
+  conf.rxmode.max_rx_pkt_len = new_mtu + KNI_ENET_HEADER_SIZE + KNI_ENET_FCS_SIZE;
+
+  // Reconfigure port and increase descriptors to 1024
+  rte_eth_dev_configure(port, 1, 1, &conf);
+  rte_eth_dev_adjust_nb_rx_tx_desc(port, &nb_rxd, nullptr);
+
+  // Setup RX queue
+  rxq_conf = dev_info.default_rxconf;
+  rxq_conf.offloads = conf.rxmode.offloads;
+  rte_eth_rx_queue_setup(port, 0, nb_rxd, rte_eth_dev_socket_id(port), &rxq_conf, pktmbuf_pool);
+
+  // Start the port
+  rte_eth_dev_start(port);
+}
+
 rte_kni *init_kni(unsigned int port, uint8_t mac_addr[], rte_mempool *pktmbuf_pool) {
   rte_kni_conf conf;
   rte_kni_ops ops;
@@ -68,11 +100,10 @@ rte_kni *init_kni(unsigned int port, uint8_t mac_addr[], rte_mempool *pktmbuf_po
 
   // Set stuff up
   ops.port_id = port;
-  ops.change_mtu = reinterpret_cast<int (*)(uint16_t, uint8_t)>(kni_change_mtu());
+  ops.change_mtu = reinterpret_cast<int (*)(uint16_t, unsigned int)>(kni_change_mtu(port, 1500, pktmbuf_pool));
   ops.config_network_if = reinterpret_cast<int (*)(uint16_t, uint8_t)>(rte_eth_dev_start(port));
   ops.config_mac_address = reinterpret_cast<int (*)(uint16_t, uint8_t *)>(rte_eth_dev_default_mac_addr_set(port,
                                                                                                            (struct rte_ether_addr *) mac_addr));
-
   return rte_kni_alloc(pktmbuf_pool, &conf, &ops);
 }
 
