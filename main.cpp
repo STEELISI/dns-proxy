@@ -3,7 +3,6 @@
 #include <iostream>
 #include <signal.h>
 
-
 #include "dns.h"
 #include "dpdk_addons.h"
 
@@ -35,8 +34,8 @@ int main(int argc, char *argv[]) {
     rte_exit(EXIT_FAILURE, "Could not initialise EAL (%d)\n", ret);
 
   // Create mubf pool
-  pktmbuf_pool = rte_pktmbuf_pool_create("mbuf_pool", 131072,
-                                         32, 0, 4096, rte_socket_id());
+  pktmbuf_pool = rte_pktmbuf_pool_create("mbuf_pool", 131072, 32, 0, 4096,
+                                         rte_socket_id());
   if (pktmbuf_pool == nullptr)
     rte_exit(EXIT_FAILURE, "Could not initialise mbuf pool\n");
 
