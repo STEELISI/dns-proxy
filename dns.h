@@ -9,7 +9,6 @@
  */
 bool check_if_query(const uint8_t *buffer);
 
-
 /**
  * Check if a packet is has an invalid TLD
  * @param buffer the input packet as a byte array
@@ -35,6 +34,6 @@ uint8_t **create_nxdomain_reply(const uint8_t *buffer);
  * Read each line of a input file for TLDs
  * @param input_file location of input tld
  */
-void insert_tlds(const std::string& input_file);
+void insert_tlds(const std::string &input_file);
 
-#endif //DNS_PROXY__DNS_H
+#endif // DNS_PROXY__DNS_H
