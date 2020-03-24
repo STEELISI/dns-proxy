@@ -5,8 +5,7 @@
 #include <fstream>
 #include <unordered_set>
 
-std::unordered_set<std::string> *valid_tlds =
-    new std::unordered_set<std::string>;
+std::unordered_set<std::string> *valid_tlds = new std::unordered_set<std::string>;
 
 bool request_is_query(const uint8_t *buffer) {
   // Get the second set of 16 bits
@@ -24,7 +23,7 @@ bool request_is_query(const uint8_t *buffer) {
   return (opcode == 0x0000);
 }
 
-void insert_tlds(const std::string &input_file) {
+void insert_tlds(const std::string& input_file) {
   std::ifstream file(input_file);
   std::string in_str;
   // Insert everything but comments
@@ -50,9 +49,10 @@ bool check_if_tld_valid(const uint8_t *buffer) {
   std::string domain = get_domain_name(buffer);
 
   // Get TLD and make it uppercase
-  std::string tld =
-      domain.substr(domain.find_last_of('.') + 1, domain.length() - 1);
-  std::for_each(tld.begin(), tld.end(), [](char &c) { c = std::toupper(c); });
+  std::string tld = domain.substr(domain.find_last_of('.') + 1, domain.length() - 1);
+  std::for_each(tld.begin(), tld.end(), [](char & c){
+    c = std::toupper(c);
+  });
 
   // Return true if the TLD is in valid_tlds
   return valid_tlds->find(tld) != valid_tlds->end();
@@ -60,6 +60,7 @@ bool check_if_tld_valid(const uint8_t *buffer) {
 
 uint8_t **create_nxdomain_reply(const uint8_t *buffer) {
   uint8_t *ret_packet;
+  
 
   return &ret_packet;
 }
