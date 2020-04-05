@@ -140,8 +140,7 @@ struct rte_ring *worker_tx_ring;
 struct rte_ring *worker_rx_ring;
 
 /* Print out statistics on packets handled */
-static void
-print_stats(void) {
+static void print_stats(void) {
     uint16_t i;
 
     printf("\n**KNI example application statistics**\n"
@@ -165,8 +164,7 @@ print_stats(void) {
 }
 
 /* Custom handling of signals to handle stats and kni processing */
-static void
-signal_handler(int signum) {
+static void signal_handler(int signum) {
     /* When we receive a USR1 signal, print stats */
     if (signum == SIGUSR1) {
         print_stats();
@@ -191,8 +189,7 @@ signal_handler(int signum) {
     }
 }
 
-static void
-kni_burst_free_mbufs(struct rte_mbuf **pkts, unsigned num) {
+static void kni_burst_free_mbufs(struct rte_mbuf **pkts, unsigned num) {
     unsigned i;
 
     if (pkts == NULL)
@@ -207,8 +204,7 @@ kni_burst_free_mbufs(struct rte_mbuf **pkts, unsigned num) {
 /**
  * Interface to burst rx and enqueue mbufs into rx_q
  */
-static void
-kni_ingress(struct kni_port_params *p) {
+static void kni_ingress(struct kni_port_params *p) {
     uint8_t i;
     uint16_t port_id;
     unsigned nb_rx, num;
@@ -248,8 +244,7 @@ kni_ingress(struct kni_port_params *p) {
 /**
  * Interface to dequeue mbufs from tx_q and burst tx
  */
-static void
-kni_egress(struct kni_port_params *p) {
+static void kni_egress(struct kni_port_params *p) {
     uint8_t i;
     uint16_t port_id;
     unsigned nb_tx, num;
@@ -281,8 +276,7 @@ kni_egress(struct kni_port_params *p) {
     }
 }
 
-static int
-main_loop(__rte_unused void *arg) {
+static int main_loop(__rte_unused void *arg) {
     uint16_t i;
     int32_t f_stop;
     int32_t f_pause;
@@ -340,9 +334,13 @@ main_loop(__rte_unused void *arg) {
     return 0;
 }
 
+// TODO: read from kni_ingress and drop non-DNS packets
+static int worker_loop(__rte_unused void *arg) {
+
+}
+
 /* Display usage instructions */
-static void
-print_usage(const char *prgname) {
+static void print_usage(const char *prgname) {
     RTE_LOG(INFO, APP, "\nUsage: %s [EAL options] -- -p PORTMASK -P -m "
                        "[--config (port,lcore_rx,lcore_tx,lcore_kthread...)"
                        "[,(port,lcore_rx,lcore_tx,lcore_kthread...)]]\n"
@@ -355,8 +353,7 @@ print_usage(const char *prgname) {
 }
 
 /* Convert string to unsigned number. 0 is returned if error occurs */
-static uint32_t
-parse_unsigned(const char *portmask) {
+static uint32_t parse_unsigned(const char *portmask) {
     char *end = NULL;
     unsigned long num;
 
@@ -367,8 +364,7 @@ parse_unsigned(const char *portmask) {
     return (uint32_t) num;
 }
 
-static void
-print_config(void) {
+static void print_config(void) {
     uint32_t i, j;
     struct kni_port_params **p = kni_port_params_array;
 
@@ -384,8 +380,7 @@ print_config(void) {
     }
 }
 
-static int
-parse_config(const char *arg) {
+static int parse_config(const char *arg) {
     const char *p, *p0 = arg;
     char s[256], *end;
     unsigned size;
@@ -474,8 +469,7 @@ parse_config(const char *arg) {
     return -1;
 }
 
-static int
-validate_parameters(uint32_t portmask) {
+static int validate_parameters(uint32_t portmask) {
     uint32_t i;
 
     if (!portmask) {
@@ -511,8 +505,7 @@ validate_parameters(uint32_t portmask) {
 #define CMDLINE_OPT_CONFIG  "config"
 
 /* Parse the arguments given in the command line of the application */
-static int
-parse_args(int argc, char **argv) {
+static int parse_args(int argc, char **argv) {
     int opt, longindex, ret = 0;
     const char *prgname = argv[0];
     static struct option longopts[] = {
@@ -564,8 +557,7 @@ parse_args(int argc, char **argv) {
 }
 
 /* Initialize KNI subsystem */
-static void
-init_kni(void) {
+static void init_kni(void) {
     unsigned int num_of_kni_ports = 0, i;
     struct kni_port_params **params = kni_port_params_array;
 
@@ -582,8 +574,7 @@ init_kni(void) {
 }
 
 /* Initialise a single port on an Ethernet device */
-static void
-init_port(uint16_t port) {
+static void init_port(uint16_t port) {
     int ret;
     uint16_t nb_rxd = NB_RXD;
     uint16_t nb_txd = NB_TXD;
@@ -646,8 +637,7 @@ init_port(uint16_t port) {
 }
 
 /* Check the link status of all ports in up to 9s, and print them finally */
-static void
-check_all_ports_link_status(uint32_t port_mask) {
+static void check_all_ports_link_status(uint32_t port_mask) {
 #define CHECK_INTERVAL 100 /* 100ms */
 #define MAX_CHECK_TIME 90 /* 9s (90 * 100ms) in total */
     uint16_t portid;
@@ -707,8 +697,7 @@ check_all_ports_link_status(uint32_t port_mask) {
     }
 }
 
-static void
-log_link_state(struct rte_kni *kni, int prev, struct rte_eth_link *link) {
+static void log_link_state(struct rte_kni *kni, int prev, struct rte_eth_link *link) {
     if (kni == NULL || link == NULL)
         return;
 
@@ -728,8 +717,7 @@ log_link_state(struct rte_kni *kni, int prev, struct rte_eth_link *link) {
  * Monitor the link status of all ports and update the
  * corresponding KNI interface(s)
  */
-static void *
-monitor_all_ports_link_status(void *arg) {
+static void * monitor_all_ports_link_status(void *arg) {
     uint16_t portid;
     struct rte_eth_link link;
     unsigned int i;
@@ -762,8 +750,7 @@ monitor_all_ports_link_status(void *arg) {
 }
 
 /* Callback for request of changing MTU */
-static int
-kni_change_mtu(uint16_t port_id, unsigned int new_mtu) {
+static int kni_change_mtu(uint16_t port_id, unsigned int new_mtu) {
     int ret;
     uint16_t nb_rxd = NB_RXD;
     struct rte_eth_conf conf;
@@ -832,8 +819,7 @@ kni_change_mtu(uint16_t port_id, unsigned int new_mtu) {
 }
 
 /* Callback for request of configuring network interface up/down */
-static int
-kni_config_network_interface(uint16_t port_id, uint8_t if_up) {
+static int kni_config_network_interface(uint16_t port_id, uint8_t if_up) {
     int ret = 0;
 
     if (!rte_eth_dev_is_valid_port(port_id)) {
@@ -860,16 +846,14 @@ kni_config_network_interface(uint16_t port_id, uint8_t if_up) {
     return ret;
 }
 
-static void
-print_ethaddr(const char *name, struct rte_ether_addr *mac_addr) {
+static void print_ethaddr(const char *name, struct rte_ether_addr *mac_addr) {
     char buf[RTE_ETHER_ADDR_FMT_SIZE];
     rte_ether_format_addr(buf, RTE_ETHER_ADDR_FMT_SIZE, mac_addr);
     RTE_LOG(INFO, APP, "\t%s%s\n", name, buf);
 }
 
 /* Callback for request of configuring mac address */
-static int
-kni_config_mac_address(uint16_t port_id, uint8_t mac_addr[]) {
+static int kni_config_mac_address(uint16_t port_id, uint8_t mac_addr[]) {
     int ret = 0;
 
     if (!rte_eth_dev_is_valid_port(port_id)) {
@@ -889,8 +873,7 @@ kni_config_mac_address(uint16_t port_id, uint8_t mac_addr[]) {
     return ret;
 }
 
-static int
-kni_alloc(uint16_t port_id) {
+static int kni_alloc(uint16_t port_id) {
     uint8_t i;
     struct rte_kni *kni;
     struct rte_kni_conf conf;
@@ -963,8 +946,7 @@ kni_alloc(uint16_t port_id) {
     return 0;
 }
 
-static int
-kni_free_kni(uint16_t port_id) {
+static int kni_free_kni(uint16_t port_id) {
     uint8_t i;
     struct kni_port_params **p = kni_port_params_array;
 
@@ -982,8 +964,7 @@ kni_free_kni(uint16_t port_id) {
 }
 
 /* Initialise ports/queues etc. and start main loop on each core */
-int
-main(int argc, char **argv) {
+int main(int argc, char **argv) {
     int ret;
     uint16_t nb_sys_ports, port;
     unsigned i;
@@ -1070,6 +1051,7 @@ main(int argc, char **argv) {
 
     /* Launch per-lcore function on every lcore */
     rte_eal_mp_remote_launch(main_loop, NULL, CALL_MASTER);
+    rte_eal_mp_remote_launch(worker_loop, NULL, CALL_MASTER);
     RTE_LCORE_FOREACH_SLAVE(i) {
         if (rte_eal_wait_lcore(i) < 0)
             return -1;
