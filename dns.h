@@ -24,8 +24,6 @@ extern "C" int check_if_tld_valid(const uint8_t *buffer);
  */
 extern "C" char* get_domain_name(const uint8_t *buffer);
 
-
-
 /**
  * Create an NXDOMAIN reply to the packet in the buffer
  * @param buffer the input packet as a byte array
