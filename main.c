@@ -136,6 +136,9 @@ static int kni_config_mac_address(uint16_t port_id, uint8_t mac_addr[]);
 static rte_atomic32_t kni_stop = RTE_ATOMIC32_INIT(0);
 static rte_atomic32_t kni_pause = RTE_ATOMIC32_INIT(0);
 
+struct rte_ring *worker_tx_ring;
+struct rte_ring *worker_rx_ring;
+
 /* Print out statistics on packets handled */
 static void
 print_stats(void) {
@@ -224,6 +227,10 @@ kni_ingress(struct kni_port_params *p) {
             RTE_LOG(ERR, APP, "Error receiving from eth\n");
             return;
         }
+
+        /* Burst rx to worker ring */
+        rte_ring_dequeue_burst(worker_rx_ring, (void*)pkts_burst, PKT_BURST_SZ, NULL);
+
         /* Burst tx to kni */
         num = rte_kni_tx_burst(p->kni[i], pkts_burst, nb_rx);
         if (num)
@@ -247,7 +254,7 @@ kni_egress(struct kni_port_params *p) {
     uint16_t port_id;
     unsigned nb_tx, num;
     uint32_t nb_kni;
-    struct rte_mbuf *pkts_burst[PKT_BURST_SZ];
+    struct rte_mbuf *pkts_burst[PKT_BURST_SZ] __rte_cache_aligned;
 
     if (p == NULL)
         return;
@@ -261,6 +268,7 @@ kni_egress(struct kni_port_params *p) {
             RTE_LOG(ERR, APP, "Error receiving from KNI\n");
             return;
         }
+
         /* Burst tx to eth */
         nb_tx = rte_eth_tx_burst(port_id, 0, pkts_burst, (uint16_t) num);
         if (nb_tx)
@@ -1009,6 +1017,10 @@ main(int argc, char **argv) {
         rte_exit(EXIT_FAILURE, "Could not initialise mbuf pool\n");
         return -1;
     }
+
+    // Create ring buffers
+    worker_tx_ring = rte_ring_create("Worker ring output", 65536, rte_socket_id(), RING_F_SC_DEQ);
+    worker_rx_ring = rte_ring_create("Worker ring output", 65536, rte_socket_id(), RING_F_SC_DEQ);
 
     /* Get number of ports found in scan */
     nb_sys_ports = rte_eth_dev_count_avail();
