@@ -11,6 +11,7 @@
 #include <stdarg.h>
 #include <errno.h>
 #include <getopt.h>
+#include <memory.h>
 
 #include <netinet/in.h>
 #include <linux/if.h>
@@ -33,7 +34,6 @@
 #include <rte_interrupts.h>
 #include <rte_bus_pci.h>
 #include <rte_debug.h>
-#include <rte_ether.h>
 #include <rte_ethdev.h>
 #include <rte_mempool.h>
 #include <rte_mbuf.h>
@@ -41,6 +41,11 @@
 #include <rte_cycles.h>
 #include <rte_malloc.h>
 #include <rte_kni.h>
+#include <rte_ip.h>
+#include <rte_udp.h>
+#include <rte_ether.h>
+
+#include "dns.h"
 
 /* Macros for printing using RTE_LOG */
 #define RTE_LOGTYPE_APP RTE_LOGTYPE_USER1
@@ -225,7 +230,7 @@ static void kni_ingress(struct kni_port_params *p) {
         }
 
         /* Burst rx to worker ring */
-        rte_ring_dequeue_burst(worker_rx_ring, (void*)pkts_burst, PKT_BURST_SZ, NULL);
+        rte_ring_dequeue_burst(worker_rx_ring, (void **)pkts_burst, PKT_BURST_SZ, NULL);
 
         /* Burst tx to kni */
         num = rte_kni_tx_burst(p->kni[i], pkts_burst, nb_rx);
@@ -336,7 +341,31 @@ static int main_loop(__rte_unused void *arg) {
 
 // TODO: read from kni_ingress and drop non-DNS packets
 static int worker_loop(__rte_unused void *arg) {
+    struct rte_mbuf *buf[16] __rte_cache_aligned;
+    int32_t f_stop, f_pause;
 
+    struct ether_hdr *eth_hdr;
+    struct ipv4_hdr *ip_hdr;
+    struct udp_hdr *udp_hdr;
+
+    while(1) {
+        f_stop = rte_atomic32_read(&kni_stop);
+        f_pause = rte_atomic32_read(&kni_pause);
+
+        if (f_stop)
+            break;
+        if (f_pause)
+            continue;
+
+        int num = rte_ring_dequeue_burst(worker_rx_ring, (void **)buf, 16, NULL);
+        for (uint32_t i = 0; i < num; i++) {
+            uint8_t *data_addr = rte_pktmbuf_mtod(buf[i], uint8_t *);
+            if(check_if_query(data_addr)) {
+
+            }
+
+        }
+    }
 }
 
 /* Display usage instructions */
@@ -432,8 +461,7 @@ static int parse_config(const char *arg) {
             printf("Port %d has been configured\n", port_id);
             goto fail;
         }
-        kni_port_params_array[port_id] =
-                rte_zmalloc("KNI_port_params",
+        kni_port_params_array[port_id] = (kni_port_params*) rte_zmalloc("KNI_port_params",
                             sizeof(struct kni_port_params), RTE_CACHE_LINE_SIZE);
         kni_port_params_array[port_id]->port_id = port_id;
         kni_port_params_array[port_id]->lcore_rx =
