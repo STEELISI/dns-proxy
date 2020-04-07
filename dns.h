@@ -1,12 +1,14 @@
 #ifndef DNS_PROXY__DNS_H
 #define DNS_PROXY__DNS_H
 
+#include <string>
+
 /**
  * Check whether a packet is a standard QUERY
  * @param buffer the input packet as a byte array
- * @return 1 if the request is a query, 0 otherwise
+ * @return true if the request is a query, false otherwise
  */
-int check_if_query(const unsigned char *buffer);
+bool check_if_query(const unsigned char *buffer);
 
 
 /**
@@ -21,7 +23,13 @@ int check_if_tld_valid(const unsigned char *buffer);
  * @param buffer the input packet as a byte array
  * @return the domain name as a cstring
  */
-unsigned char* get_domain_name(const unsigned char *buffer);
+std::string get_domain_name(const unsigned char *buffer);
+
+/**
+ * Puts all values from `tld.txt` into the valid_tlds unordered_set
+ * @return true if success
+ */
+bool tld_setup();
 
 /**
  * Create an NXDOMAIN reply to the packet in the buffer

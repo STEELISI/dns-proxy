@@ -215,6 +215,7 @@ static void kni_ingress(struct kni_port_params *p) {
     unsigned nb_rx, num;
     uint32_t nb_kni;
     struct rte_mbuf *pkts_burst[PKT_BURST_SZ];
+    int good_packets = 0;
 
     if (p == NULL)
         return;
@@ -231,18 +232,6 @@ static void kni_ingress(struct kni_port_params *p) {
 
         /* Burst rx to worker ring */
         rte_ring_dequeue_burst(worker_rx_ring, (void **)pkts_burst, PKT_BURST_SZ, NULL);
-
-        /* Burst tx to kni */
-        num = rte_kni_tx_burst(p->kni[i], pkts_burst, nb_rx);
-        if (num)
-            kni_stats[port_id].rx_packets += num;
-
-        rte_kni_handle_request(p->kni[i]);
-        if (unlikely(num < nb_rx)) {
-            /* Free mbufs not tx to kni interface */
-            kni_burst_free_mbufs(&pkts_burst[num], nb_rx - num);
-            kni_stats[port_id].rx_dropped += nb_rx - num;
-        }
     }
 }
 
@@ -252,7 +241,7 @@ static void kni_ingress(struct kni_port_params *p) {
 static void kni_egress(struct kni_port_params *p) {
     uint8_t i;
     uint16_t port_id;
-    unsigned nb_tx, num;
+    unsigned int nb_tx, num;
     uint32_t nb_kni;
     struct rte_mbuf *pkts_burst[PKT_BURST_SZ] __rte_cache_aligned;
 
@@ -261,6 +250,8 @@ static void kni_egress(struct kni_port_params *p) {
 
     nb_kni = p->nb_kni;
     port_id = p->port_id;
+
+    int good_nums;
     for (i = 0; i < nb_kni; i++) {
         /* Burst rx from kni */
         num = rte_kni_rx_burst(p->kni[i], pkts_burst, PKT_BURST_SZ);
@@ -357,14 +348,20 @@ static int worker_loop(__rte_unused void *arg) {
         if (f_pause)
             continue;
 
-        int num = rte_ring_dequeue_burst(worker_rx_ring, (void **)buf, 16, NULL);
+        int num = rte_ring_dequeue_burst(worker_rx_ring, (void **)buf, 16, nullptr);
+
         for (uint32_t i = 0; i < num; i++) {
             uint8_t *data_addr = rte_pktmbuf_mtod(buf[i], uint8_t *);
-            if(check_if_query(data_addr)) {
-
-            }
-
+            // Not a DNS packet, drop
+            if (!check_if_query(data_addr))
+                rte_pktmbuf_free(buf[i]);
+            // Not a valid TLD, drop
+            else if (!check_if_tld_valid(data_addr))
+                rte_pktmbuf_free(buf[i]);
         }
+
+        // Pass the rest over to KNI
+        rte_ring_enqueue_burst(worker_tx_ring, (void **)buf, 16, nullptr);
     }
 }
 
@@ -387,7 +384,8 @@ static uint32_t parse_unsigned(const char *portmask) {
     unsigned long num;
 
     num = strtoul(portmask, &end, 16);
-    if ((portmask[0] == '\0') || (end == NULL) || (*end != '\0'))
+
+if ((portmask[0] == '\0') || (end == NULL) || (*end != '\0'))
         return 0;
 
     return (uint32_t) num;
