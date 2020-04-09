@@ -998,6 +998,8 @@ int main(int argc, char **argv) {
     pthread_t kni_link_tid;
     int pid;
 
+    tld_setup();
+
     /* Associate signal_hanlder function with USR signals */
     signal(SIGUSR1, signal_handler);
     signal(SIGUSR2, signal_handler);
