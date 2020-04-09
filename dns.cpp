@@ -25,15 +25,6 @@ bool check_if_query(const unsigned char *buffer) {
     return (opcode == 0x0000);
 }
 
-void insert_tlds(const std::string& input_file) {
-    std::ifstream file(input_file);
-    std::string in_str;
-    // Insert everything but comments
-    while (std::getline(file, in_str))
-        if (in_str.length() > 0 && in_str[0] != '#')
-            valid_tlds->insert(in_str);
-}
-
 std::string get_domain_name(const unsigned char *buffer) {
     std::string domain;
     // Skip header
@@ -57,7 +48,7 @@ int check_if_tld_valid(const unsigned char *buffer) {
     });
 
     // Return true if the TLD is in valid_tlds
-    return valid_tlds->find(tld) != valid_tlds->end();
+    return valid_tlds.find(tld) != valid_tlds.end();
 }
 
 unsigned char **create_nxdomain_reply(const unsigned char *buffer) {
@@ -68,5 +59,16 @@ unsigned char **create_nxdomain_reply(const unsigned char *buffer) {
 }
 
 bool tld_setup() {
+    std::ifstream tld_in;
+    std::string line;
 
+    tld_in.open("tld.txt");
+
+    while(getline(tld_in,line)) {
+        // Make sure we're not getting a comment
+        if(line[0] != '#')
+            valid_tlds.insert(line);
+    }
+
+    return true;
 }
