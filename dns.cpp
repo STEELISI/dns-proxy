@@ -54,7 +54,6 @@ int check_if_tld_valid(const unsigned char *buffer) {
 unsigned char **create_nxdomain_reply(const unsigned char *buffer) {
     unsigned  char *ret_packet;
 
-
     return &ret_packet;
 }
 
