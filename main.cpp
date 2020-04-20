@@ -231,7 +231,7 @@ static void kni_ingress(struct kni_port_params *p) {
         }
 
         /* Burst rx to worker ring */
-        rte_ring_dequeue_burst(worker_rx_ring, (void **)pkts_burst, PKT_BURST_SZ, NULL);
+        rte_ring_enqueue_burst(worker_rx_ring, (void **)pkts_burst, PKT_BURST_SZ, NULL);
     }
 }
 
@@ -241,7 +241,7 @@ static void kni_ingress(struct kni_port_params *p) {
 static void kni_egress(struct kni_port_params *p) {
     uint8_t i;
     uint16_t port_id;
-    unsigned int nb_tx, num;
+    unsigned int nb_tx, num, nb_rx;
     uint32_t nb_kni;
     struct rte_mbuf *pkts_burst[PKT_BURST_SZ] __rte_cache_aligned;
 
@@ -268,6 +268,26 @@ static void kni_egress(struct kni_port_params *p) {
             /* Free mbufs not tx to NIC */
             kni_burst_free_mbufs(&pkts_burst[nb_tx], num - nb_tx);
             kni_stats[port_id].tx_dropped += num - nb_tx;
+        }
+    }
+
+    for (i = 0; i < nb_kni; i++) {
+        num = rte_ring_dequeue_burst(worker_tx_ring, reinterpret_cast<void **>(pkts_burst), 16, nullptr);
+        if (unlikely(num > PKT_BURST_SZ)) {
+            RTE_LOG(ERR, APP, "Error receiving from worker\n");
+            return;
+        }
+
+        /* Burst tx to kni */
+        num = rte_kni_tx_burst(p->kni[i], pkts_burst, nb_rx);
+        if (num)
+            kni_stats[port_id].rx_packets += num;
+
+        rte_kni_handle_request(p->kni[i]);
+        if (unlikely(num < nb_rx)) {
+            /* Free mbufs not tx to kni interface */
+            kni_burst_free_mbufs(&pkts_burst[num], nb_rx - num);
+            kni_stats[port_id].rx_dropped += nb_rx - num;
         }
     }
 }
