@@ -1061,8 +1061,8 @@ int main(int argc, char **argv) {
     }
 
     // Create ring buffers
-    worker_tx_ring = rte_ring_create("Worker ring output", 65536, rte_socket_id(), RING_F_SC_DEQ);
-    worker_rx_ring = rte_ring_create("Worker ring output", 65536, rte_socket_id(), RING_F_SC_DEQ);
+    worker_tx_ring = rte_ring_create("Worker ring output", 1024, rte_socket_id(), RING_F_SC_DEQ);
+    worker_rx_ring = rte_ring_create("Worker ring input", 1024, rte_socket_id(), RING_F_SC_DEQ);
 
     /* Get number of ports found in scan */
     nb_sys_ports = rte_eth_dev_count_avail();
