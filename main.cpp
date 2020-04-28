@@ -357,7 +357,15 @@ static int main_loop(__rte_unused void *arg) {
                    (uint8_t) lcore_id) {
             flag = LCORE_TX;
             break;
-        }
+        } else if (kni_port_params_array[i]->lcore_tx + 1 ==
+                   (uint8_t) lcore_id) {
+            flag = WORKER_TX;
+            break;
+        } else if (kni_port_params_array[i]->lcore_tx + 2 ==
+                   (uint8_t) lcore_id) {
+            flag = WORKER_RX;
+            break;
+          }
     }
 
     if (flag == LCORE_RX) {
