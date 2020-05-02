@@ -5,45 +5,30 @@
 #include <errno.h>
 #include <getopt.h>
 #include <inttypes.h>
-#include <memory.h>
-#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/queue.h>
 
-#include <fcntl.h>
-#include <linux/if.h>
-#include <linux/if_tun.h>
-#include <netinet/in.h>
 #include <signal.h>
-#include <sys/ioctl.h>
 #include <unistd.h>
 
 #include <rte_atomic.h>
 #include <rte_branch_prediction.h>
-#include <rte_bus_pci.h>
 #include <rte_common.h>
 #include <rte_cycles.h>
-#include <rte_debug.h>
 #include <rte_eal.h>
 #include <rte_ethdev.h>
 #include <rte_ether.h>
-#include <rte_interrupts.h>
-#include <rte_ip.h>
 #include <rte_kni.h>
 #include <rte_launch.h>
 #include <rte_lcore.h>
 #include <rte_log.h>
 #include <rte_malloc.h>
 #include <rte_mbuf.h>
-#include <rte_memcpy.h>
-#include <rte_memory.h>
 #include <rte_mempool.h>
 #include <rte_per_lcore.h>
 #include <rte_string_fns.h>
-#include <rte_udp.h>
 
 #include "dns.h"
 
@@ -98,12 +83,8 @@ struct kni_port_params {
 static struct kni_port_params *kni_port_params_array[RTE_MAX_ETHPORTS];
 
 /* Options for configuring ethernet port */
-static struct rte_eth_conf port_conf = {
-    .txmode =
-        {
-            .mq_mode = ETH_MQ_TX_NONE,
-        },
-};
+rte_eth_txmode tx_mode;
+rte_eth_conf port_conf;
 
 /* Mempool for mbufs */
 static struct rte_mempool *pktmbuf_pool = NULL;
@@ -234,8 +215,7 @@ static void kni_ingress(struct kni_port_params *p) {
     }
 
     /* Burst rx to worker ring */
-    rte_ring_enqueue_burst(worker_rx_ring, (void **)pkts_burst, PKT_BURST_SZ,
-                           NULL);
+    rte_ring_enqueue_burst(worker_rx_ring, (void **)pkts_burst, nb_rx, NULL);
   }
 }
 
@@ -253,9 +233,9 @@ static void worker_egress(struct kni_port_params *p) {
   nb_kni = p->nb_kni;
   port_id = p->port_id;
   for (i = 0; i < nb_kni; i++) {
-    num = rte_ring_dequeue_burst(
+    nb_rx = rte_ring_dequeue_burst(
         worker_tx_ring, reinterpret_cast<void **>(pkts_burst), 16, nullptr);
-    if (unlikely(num > PKT_BURST_SZ)) {
+    if (unlikely(nb_rx > PKT_BURST_SZ)) {
       RTE_LOG(ERR, APP, "Error receiving from worker\n");
       return;
     }
@@ -323,14 +303,10 @@ static int worker_ingress(struct kni_port_params *p) {
       // Not a DNS packet, continue
       if (!check_if_query(buf[i]))
         continue;
-      // Not a valid TLD, drop
-      else if (!check_if_tld_valid(
-                   reinterpret_cast<const unsigned char *>(buf[i])))
-        rte_pktmbuf_free(buf[i]);
     }
 
   // Pass the rest over to KNI
-  rte_ring_enqueue_burst(worker_tx_ring, (void **)buf, 16, nullptr);
+  rte_ring_enqueue_burst(worker_tx_ring, (void **)buf, num, nullptr);
 }
 
 static int main_loop(__rte_unused void *arg) {
@@ -393,11 +369,27 @@ static int main_loop(__rte_unused void *arg) {
       kni_egress(kni_port_params_array[i]);
     }
   } else if (flag == WORKER_TX) {
+    RTE_LOG(INFO, APP, "Lcore %u is WORKER_TX\n",
+            kni_port_params_array[i]->lcore_tx + 1);
     while (1) {
+      f_stop = rte_atomic32_read(&kni_stop);
+      f_pause = rte_atomic32_read(&kni_pause);
+      if (f_stop)
+        break;
+      if (f_pause)
+        continue;
       worker_egress(kni_port_params_array[i]);
     }
   } else if (flag == WORKER_RX) {
+    RTE_LOG(INFO, APP, "Lcore %u is WORKER_RX\n",
+            kni_port_params_array[i]->lcore_tx + 2);
     while (1) {
+      f_stop = rte_atomic32_read(&kni_stop);
+      f_pause = rte_atomic32_read(&kni_pause);
+      if (f_stop)
+        break;
+      if (f_pause)
+        continue;
       worker_ingress(kni_port_params_array[i]);
     }
   } else
@@ -1030,6 +1022,9 @@ int main(int argc, char **argv) {
   int pid;
 
   tld_setup();
+
+  tx_mode.mq_mode = ETH_MQ_TX_NONE;
+  port_conf.txmode = tx_mode;
 
   /* Associate signal_hanlder function with USR signals */
   signal(SIGUSR1, signal_handler);
