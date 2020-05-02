@@ -12,7 +12,7 @@
 std::unordered_set<std::string> valid_tlds;
 
 // Local IP address, change as needed (currently 10.1.1.2)
-uint32_t local_ip = 0x0a010102;
+uint32_t local_ip = 0x0201010a;
 
 bool check_if_query(rte_mbuf *pkt) {
   struct rte_ether_hdr *eth_hdr;
@@ -39,19 +39,17 @@ bool check_if_query(rte_mbuf *pkt) {
     return false;
 
   // Get the second set of 16 bits
-  char* buffer = (char *) udp_hdr + sizeof(struct rte_udp_hdr);
+  char* buffer = (char *) udp_hdr + sizeof(struct rte_udp_hdr) + 2;
   uint16_t first_16_bits = 0;
   memcpy(&first_16_bits, buffer + 2, 2);
 
   // Read byte 16 and make sure it's a query first
-  if ((first_16_bits & 0x8000) != 0x0000)
+  if ((first_16_bits >> 15) != 0x0000)
     return false;
 
-  // Read bytes 17-20 and shift back
-  auto opcode = (first_16_bits & 0x7800) >> 11;
-
-  // Return true if the request is a standard query
-  return (opcode == 0x0000);
+  // Return true if standard query
+  if ((first_16_bits >> 11) ==  0)
+    return true;
 }
 
 std::string get_domain_name(const unsigned char *buffer) {
