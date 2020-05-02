@@ -2,13 +2,14 @@
 #define DNS_PROXY__DNS_H
 
 #include <string>
+#include <rte_mbuf.h>
 
 /**
  * Check whether a packet is a standard QUERY
  * @param buffer the input packet as a byte array
  * @return true if the request is a query, false otherwise
  */
-bool check_if_query(const unsigned char *buffer);
+bool check_if_query(rte_mbuf *pkt);
 
 
 /**
