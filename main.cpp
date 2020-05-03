@@ -2,6 +2,8 @@
  * Copyright(c) 2010-2014 Intel Corporation
  */
 
+#include <iostream>
+
 #include <errno.h>
 #include <getopt.h>
 #include <inttypes.h>
@@ -9,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include <signal.h>
 #include <unistd.h>
 
@@ -300,9 +301,10 @@ static int worker_ingress(struct kni_port_params *p) {
 
   if (num != 0)
     for (uint32_t i = 0; i < num; i++) {
-      // Not a DNS packet, continue
-      if (!check_if_query(buf[i]))
-        continue;
+      if (check_if_query(buf[i]))
+        std::cout << check_if_tld_valid(buf[i]) << std::endl;
+      else
+        std::cout << "Not a DNS packet" << std::endl;
     }
 
   // Pass the rest over to KNI
