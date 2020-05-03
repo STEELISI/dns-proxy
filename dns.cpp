@@ -3,10 +3,10 @@
 #include <algorithm>
 #include <cstring>
 #include <fstream>
+#include <netinet/in.h>
 #include <rte_ether.h>
 #include <rte_ip.h>
 #include <rte_udp.h>
-#include <netinet/in.h>
 #include <unordered_set>
 
 std::unordered_set<std::string> valid_tlds;
@@ -14,59 +14,71 @@ std::unordered_set<std::string> valid_tlds;
 // Local IP address, change as needed (currently 10.1.1.2)
 uint32_t local_ip = 0x0201010a;
 
-bool check_if_query(rte_mbuf *pkt) {
-  struct rte_ether_hdr *eth_hdr;
-  struct rte_ipv4_hdr *ip_hdr;
-  struct rte_udp_hdr *udp_hdr;
-
-  eth_hdr = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
+bool check_if_query(const rte_mbuf *pkt) {
+  rte_ether_hdr *eth_hdr = rte_pktmbuf_mtod(pkt, rte_ether_hdr *);
 
   // End if not an IPv4 packet
   if (eth_hdr->ether_type != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
     return false;
 
-  ip_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_ipv4_hdr *,
-                                   sizeof(struct rte_ether_hdr));
+  rte_ipv4_hdr *ip_hdr = rte_pktmbuf_mtod_offset(pkt, rte_ipv4_hdr *,
+                                                 sizeof(struct rte_ether_hdr));
 
   // Also end if destination is not us
   if (ip_hdr->dst_addr != local_ip)
     return false;
 
-  udp_hdr = (struct rte_udp_hdr *) ((unsigned char *) ip_hdr + sizeof(struct rte_ipv4_hdr));
+  rte_udp_hdr *udp_hdr =
+      (rte_udp_hdr *)((unsigned char *)ip_hdr + sizeof(struct rte_ipv4_hdr));
 
   // Not to DNS port
-  if(rte_be_to_cpu_16(udp_hdr->dst_port) != 53)
+  if (rte_be_to_cpu_16(udp_hdr->dst_port) != 53)
     return false;
 
   // Get the second set of 16 bits
-  char* buffer = (char *) udp_hdr + sizeof(struct rte_udp_hdr) + 2;
-  uint16_t first_16_bits = 0;
-  memcpy(&first_16_bits, buffer + 2, 2);
+  char *dns_hdr = (char *)udp_hdr + sizeof(rte_udp_hdr);
+  char *flags = 0, *qdcount_1, *qdcount_2 = 0;
+  flags = dns_hdr + 2;
+  qdcount_1 = dns_hdr + 4;
+  qdcount_2 = qdcount_1 + 1;
 
-  // Read byte 16 and make sure it's a query first
-  if ((first_16_bits >> 15) != 0x0000)
+  // Return false if not standard query
+  if ((*flags >> 3) != 0)
     return false;
 
-  // Return true if standard query
-  if ((first_16_bits >> 11) ==  0)
-    return true;
+  // Return true only if exactly one query
+  return (*qdcount_1 == 0 && *qdcount_2 == 1);
 }
 
-std::string get_domain_name(const unsigned char *buffer) {
-  std::string domain;
-  // Skip header
-  int i = 12;
+std::string get_domain_name(const rte_mbuf *pkt) {
+  // Skip headers
+  rte_ether_hdr *eth_hdr = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
+  rte_ipv4_hdr *ip_hdr = rte_pktmbuf_mtod_offset(pkt, rte_ipv4_hdr *,
+                                                 sizeof(struct rte_ether_hdr));
+  rte_udp_hdr *udp_hdr = (struct rte_udp_hdr *)((unsigned char *)ip_hdr +
+                                                sizeof(struct rte_ipv4_hdr));
+  char *qname = (char *)udp_hdr + sizeof(struct rte_udp_hdr) + 12;
 
-  while (buffer[i] != 0) {
-    domain.push_back(buffer[i]);
-    i++;
+  // Loop until the end of the query name
+  std::string query;
+  while (*qname != 0x00) {
+    // Reset query string
+    query = "";
+    // Read in the string length
+    int str_len = *qname;
+    for (int i = 0; i < str_len; i++) {
+      // Increment qname and insert into query
+      qname = qname + 1;
+      query.push_back(*qname);
+    }
+    qname = qname + 1;
   }
 
-  return domain;
+  return query;
 }
 
-int check_if_tld_valid(const unsigned char *buffer) {
-  std::string domain = get_domain_name(buffer);
+int check_if_tld_valid(const rte_mbuf *pkt) {
+  std::string domain = get_domain_name(pkt);
 
   // Get TLD and make it uppercase
   std::string tld =
