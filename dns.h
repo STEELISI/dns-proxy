@@ -2,7 +2,7 @@
 #define DNS_PROXY__DNS_H
 
 #include <string>
-#include <rte_mbuf.h>
+#include <dpdk/rte_mbuf.h>
 
 /**
  * Check whether a packet is a standard QUERY
@@ -37,6 +37,6 @@ bool tld_setup();
  * @param buffer the input packet as a byte array
  * @return a packet as a byte array
  */
-unsigned char **create_nxdomain_reply(const unsigned char *buffer);
+rte_mbuf *create_nxdomain_reply(const rte_mbuf *pkt);
 
 #endif //DNS_PROXY__DNS_H
