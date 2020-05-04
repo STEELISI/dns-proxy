@@ -7,11 +7,11 @@
 #include <errno.h>
 #include <getopt.h>
 #include <inttypes.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
 #include <unistd.h>
 
 #include <rte_atomic.h>
@@ -200,7 +200,6 @@ static void kni_ingress(struct kni_port_params *p) {
   unsigned nb_rx, num;
   uint32_t nb_kni;
   struct rte_mbuf *pkts_burst[PKT_BURST_SZ];
-  int good_packets = 0;
 
   if (p == NULL)
     return;
@@ -217,41 +216,6 @@ static void kni_ingress(struct kni_port_params *p) {
 
     /* Burst rx to worker ring */
     rte_ring_enqueue_burst(worker_rx_ring, (void **)pkts_burst, nb_rx, NULL);
-  }
-}
-
-static void worker_egress(struct kni_port_params *p) {
-  uint8_t i;
-  uint16_t port_id;
-  unsigned nb_rx, num;
-  uint32_t nb_kni;
-  struct rte_mbuf *pkts_burst[PKT_BURST_SZ];
-  int good_packets = 0;
-
-  if (p == NULL)
-    return;
-
-  nb_kni = p->nb_kni;
-  port_id = p->port_id;
-  for (i = 0; i < nb_kni; i++) {
-    nb_rx = rte_ring_dequeue_burst(
-        worker_tx_ring, reinterpret_cast<void **>(pkts_burst), 16, nullptr);
-    if (unlikely(nb_rx > PKT_BURST_SZ)) {
-      RTE_LOG(ERR, APP, "Error receiving from worker\n");
-      return;
-    }
-
-    /* Burst tx to kni */
-    num = rte_kni_tx_burst(p->kni[i], pkts_burst, nb_rx);
-    if (num)
-      kni_stats[port_id].rx_packets += num;
-
-    rte_kni_handle_request(p->kni[i]);
-    if (unlikely(num < nb_rx)) {
-      /* Free mbufs not tx to kni interface */
-      kni_burst_free_mbufs(&pkts_burst[num], nb_rx - num);
-      kni_stats[port_id].rx_dropped += nb_rx - num;
-    }
   }
 }
 
@@ -292,23 +256,109 @@ static void kni_egress(struct kni_port_params *p) {
   }
 }
 
-// TODO: read from kni_ingress and drop non-DNS packets
+// Read from kni_ingress and send non-DNS packets to worker_egress
 static int worker_ingress(struct kni_port_params *p) {
   struct rte_mbuf *buf[16] __rte_cache_aligned;
   int32_t f_stop, f_pause;
+  uint8_t i;
+  uint16_t port_id;
+  unsigned int num;
+  uint32_t nb_kni;
+  bool good_packets[PKT_BURST_SZ] = {true};
 
-  int num = rte_ring_dequeue_burst(worker_rx_ring, (void **)buf, 16, nullptr);
+  if (p == NULL)
+    return;
 
-  if (num != 0)
-    for (uint32_t i = 0; i < num; i++) {
-      if (check_if_query(buf[i]))
-        std::cout << check_if_tld_valid(buf[i]) << std::endl;
-      else
-        std::cout << "Not a DNS packet" << std::endl;
+  nb_kni = p->nb_kni;
+  port_id = p->port_id;
+  for (i = 0; i < nb_kni; i++) {
+    int num = rte_ring_dequeue_burst(worker_rx_ring, (void **)buf, PKT_BURST_SZ,
+                                     nullptr);
+    if (unlikely(num > PKT_BURST_SZ)) {
+      RTE_LOG(ERR, APP, "Error receiving from worker\n");
+      return;
     }
 
-  // Pass the rest over to KNI
-  rte_ring_enqueue_burst(worker_tx_ring, (void **)buf, num, nullptr);
+    // Flag packets we can answer
+    int bad_packets = 0;
+    for (uint32_t i = 0; i < num; i++) {
+      if (check_if_query(buf[i])) {
+        if (!check_if_tld_valid(buf[i])) {
+          good_packets[i] = false;
+          bad_packets++;
+        }
+      }
+    }
+
+    // Pass bad packets to worker_egress
+    struct rte_mbuf *bad_pkt_buf[16] __rte_cache_aligned;
+    int counter = 0;
+    for (int i = 0; i < num; i++) {
+      if (!good_packets[i]) {
+        bad_pkt_buf[counter] = buf[i];
+        counter++;
+      }
+    }
+    rte_ring_enqueue_burst(worker_tx_ring, (void **)bad_pkt_buf, bad_packets,
+                           nullptr);
+
+    // Pass good packets to KNI
+    struct rte_mbuf *good_pkt_buf[16] __rte_cache_aligned;
+    counter = 0;
+    for (int i = 0; i < num; i++) {
+      if (good_packets[i]) {
+        good_pkt_buf[counter] = buf[i];
+        counter++;
+      }
+    }
+    int good_packets = num - bad_packets;
+    num = rte_kni_tx_burst(p->kni[i], good_pkt_buf, good_packets);
+    if (num)
+      kni_stats[port_id].rx_packets += num;
+
+    rte_kni_handle_request(p->kni[i]);
+    if (unlikely(num < good_packets)) {
+      /* Free mbufs not tx to kni interface */
+      kni_burst_free_mbufs(&good_pkt_buf[num], good_packets - num);
+      kni_stats[port_id].rx_dropped += good_packets - num;
+    }
+  }
+}
+
+// TODO: Read in invalid TLD packets and write to rte_eth_tx
+static void worker_egress(struct kni_port_params *p) {
+  uint8_t i;
+  uint16_t port_id;
+  unsigned int nb_tx, num, nb_rx;
+  uint32_t nb_kni;
+  struct rte_mbuf *pkts_burst[PKT_BURST_SZ] __rte_cache_aligned;
+
+  if (p == NULL)
+    return;
+
+  nb_kni = p->nb_kni;
+  port_id = p->port_id;
+
+  int good_nums;
+  for (i = 0; i < nb_kni; i++) {
+    /* Burst rx from kni */
+    int num = rte_ring_dequeue_burst(worker_tx_ring, (void **)pkts_burst,
+                                 PKT_BURST_SZ, nullptr);
+    if (unlikely(num > PKT_BURST_SZ)) {
+      RTE_LOG(ERR, APP, "Error receiving from KNI\n");
+      return;
+    }
+
+    /* Burst tx to eth */
+    nb_tx = rte_eth_tx_burst(port_id, 0, pkts_burst, (uint16_t)num);
+    if (nb_tx)
+      kni_stats[port_id].tx_packets += nb_tx;
+    if (unlikely(nb_tx < num)) {
+      /* Free mbufs not tx to NIC */
+      kni_burst_free_mbufs(&pkts_burst[nb_tx], num - nb_tx);
+      kni_stats[port_id].tx_dropped += num - nb_tx;
+    }
+  }
 }
 
 static int main_loop(__rte_unused void *arg) {
