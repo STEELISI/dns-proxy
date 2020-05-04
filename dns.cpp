@@ -2,11 +2,13 @@
 
 #include <algorithm>
 #include <cstring>
+#include <dpdk/rte_ether.h>
+#include <dpdk/rte_ip.h>
+#include <dpdk/rte_malloc.h>
+#include <dpdk/rte_memcpy.h>
+#include <dpdk/rte_udp.h>
 #include <fstream>
 #include <netinet/in.h>
-#include <rte_ether.h>
-#include <rte_ip.h>
-#include <rte_udp.h>
 #include <unordered_set>
 
 std::unordered_set<std::string> valid_tlds;
@@ -73,6 +75,7 @@ std::string get_domain_name(const rte_mbuf *pkt) {
     else
       break;
   }
+#include <dpdk/rte_ether.h>
 
   for (int i = offset + 1; i <= offset + str_len; i++)
     query.push_back(*(qname_start + i));
@@ -92,10 +95,53 @@ int check_if_tld_valid(const rte_mbuf *pkt) {
   return valid_tlds.find(tld) != valid_tlds.end();
 }
 
-unsigned char **create_nxdomain_reply(const unsigned char *buffer) {
-  unsigned char *ret_packet;
+rte_mbuf *create_nxdomain_reply(const rte_mbuf *pkt) {
+  rte_mbuf *ret_packet = (rte_mbuf *)rte_malloc(nullptr, sizeof(rte_mbuf), 0);
+  // Set up input headers
+  rte_ether_hdr *out_eth_hdr =
+      (rte_ether_hdr *)rte_pktmbuf_append(ret_packet, sizeof(rte_ether_hdr));
+  rte_ipv4_hdr *out_ip_hdr =
+      (rte_ipv4_hdr *)rte_pktmbuf_append(ret_packet, sizeof(rte_ipv4_hdr));
+  rte_udp_hdr *out_udp_hdr =
+      (rte_udp_hdr *)rte_pktmbuf_append(ret_packet, sizeof(rte_udp_hdr));
 
-  return &ret_packet;
+  // Set up output headers
+  rte_ether_hdr *in_eth_hdr = rte_pktmbuf_mtod(pkt, rte_ether_hdr *);
+  rte_ipv4_hdr *in_ip_hdr =
+      rte_pktmbuf_mtod_offset(pkt, rte_ipv4_hdr *, sizeof(rte_ether_hdr));
+  rte_udp_hdr *in_udp_hdr =
+      (struct rte_udp_hdr *)((unsigned char *)in_ip_hdr + sizeof(rte_ipv4_hdr));
+
+  // Set up Ethernet header
+  rte_memcpy(&out_eth_hdr, &in_eth_hdr, sizeof(out_eth_hdr));
+  rte_memcpy(&out_eth_hdr->d_addr, &in_eth_hdr->s_addr,
+             sizeof(out_eth_hdr->d_addr));
+  rte_memcpy(&out_eth_hdr->s_addr, &in_eth_hdr->d_addr,
+             sizeof(out_eth_hdr->s_addr));
+
+  // Set up IPv4 header
+  rte_memcpy(&out_ip_hdr, &in_ip_hdr, sizeof(out_ip_hdr));
+  rte_memcpy(&out_ip_hdr->dst_addr, &in_ip_hdr->src_addr,
+             sizeof(out_ip_hdr->dst_addr));
+  rte_memcpy(&out_ip_hdr->src_addr, &in_ip_hdr->dst_addr,
+             sizeof(out_ip_hdr->src_addr));
+
+  // Set up UDP header
+  rte_memcpy(&out_udp_hdr, &in_udp_hdr, sizeof(out_udp_hdr));
+  rte_memcpy(&out_udp_hdr->dst_port, &in_udp_hdr->src_port,
+             sizeof(out_udp_hdr->dst_port));
+  rte_memcpy(&out_udp_hdr->src_port, &in_udp_hdr->dst_port,
+             sizeof(out_udp_hdr->src_port));
+  out_udp_hdr->dgram_cksum = 0; // Ignore UDP checksum
+
+  // Set UDP and IPv4 length
+
+
+  // Set IPv4 checksum
+  out_ip_hdr->hdr_checksum = 0;
+  out_ip_hdr->hdr_checksum = rte_ipv4_cksum(out_ip_hdr);
+
+  return ret_packet;
 }
 
 bool tld_setup() {

@@ -14,22 +14,22 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <rte_atomic.h>
-#include <rte_branch_prediction.h>
-#include <rte_common.h>
-#include <rte_cycles.h>
-#include <rte_eal.h>
-#include <rte_ethdev.h>
-#include <rte_ether.h>
-#include <rte_kni.h>
-#include <rte_launch.h>
-#include <rte_lcore.h>
-#include <rte_log.h>
-#include <rte_malloc.h>
-#include <rte_mbuf.h>
-#include <rte_mempool.h>
-#include <rte_per_lcore.h>
-#include <rte_string_fns.h>
+#include <dpdk/rte_atomic.h>
+#include <dpdk/rte_branch_prediction.h>
+#include <dpdk/rte_common.h>
+#include <dpdk/rte_cycles.h>
+#include <dpdk/rte_eal.h>
+#include <dpdk/rte_ethdev.h>
+#include <dpdk/rte_ether.h>
+#include <dpdk/rte_kni.h>
+#include <dpdk/rte_launch.h>
+#include <dpdk/rte_lcore.h>
+#include <dpdk/rte_log.h>
+#include <dpdk/rte_malloc.h>
+#include <dpdk/rte_mbuf.h>
+#include <dpdk/rte_mempool.h>
+#include <dpdk/rte_per_lcore.h>
+#include <dpdk/rte_string_fns.h>
 
 #include "dns.h"
 
@@ -257,10 +257,9 @@ static void kni_egress(struct kni_port_params *p) {
 }
 
 // Read from kni_ingress and send non-DNS packets to worker_egress
-static int worker_ingress(struct kni_port_params *p) {
+static void worker_ingress(struct kni_port_params *p) {
   struct rte_mbuf *buf[16] __rte_cache_aligned;
   int32_t f_stop, f_pause;
-  uint8_t i;
   uint16_t port_id;
   unsigned int num;
   uint32_t nb_kni;
@@ -342,7 +341,7 @@ static void worker_egress(struct kni_port_params *p) {
   int good_nums;
   for (i = 0; i < nb_kni; i++) {
     /* Burst rx from kni */
-    int num = rte_ring_dequeue_burst(worker_tx_ring, (void **)pkts_burst,
+    num = rte_ring_dequeue_burst(worker_tx_ring, (void **)pkts_burst,
                                  PKT_BURST_SZ, nullptr);
     if (unlikely(num > PKT_BURST_SZ)) {
       RTE_LOG(ERR, APP, "Error receiving from KNI\n");
