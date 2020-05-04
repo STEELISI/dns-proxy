@@ -61,18 +61,21 @@ std::string get_domain_name(const rte_mbuf *pkt) {
 
   // Loop until the end of the query name
   std::string query;
-  while (*qname != 0x00) {
-    // Reset query string
-    query = "";
+  int str_len, offset = 0;
+  char *qname_start = qname;
+
+  while (true) {
     // Read in the string length
-    int str_len = *qname;
-    for (int i = 0; i < str_len; i++) {
-      // Increment qname and insert into query
-      qname = qname + 1;
-      query.push_back(*qname);
-    }
-    qname = qname + 1;
+    str_len = *qname;
+    qname = qname + str_len + 1;
+    if (*qname != 0x0)
+      offset += str_len + 1;
+    else
+      break;
   }
+
+  for (int i = offset + 1; i <= offset + str_len; i++)
+    query.push_back(*(qname_start + i));
 
   return query;
 }
