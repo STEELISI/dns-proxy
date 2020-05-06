@@ -15,9 +15,9 @@ bool check_if_query(const rte_mbuf *pkt);
 /**
  * Check if a packet is has an invalid TLD
  * @param buffer the input packet as a byte array
- * @return 1 if the TLD is valid, 0 otherwise
+ * @return true if the TLD is valid, false otherwise
  */
-int check_if_tld_valid(const rte_mbuf *pkt);
+bool check_if_tld_valid(const rte_mbuf *pkt);
 
 /**
  * Get the domain name from a packet
