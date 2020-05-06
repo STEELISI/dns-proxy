@@ -75,7 +75,6 @@ std::string get_domain_name(const rte_mbuf *pkt) {
     else
       break;
   }
-#include <dpdk/rte_ether.h>
 
   for (int i = offset + 1; i <= offset + str_len; i++)
     query.push_back(*(qname_start + i));
@@ -83,7 +82,7 @@ std::string get_domain_name(const rte_mbuf *pkt) {
   return query;
 }
 
-int check_if_tld_valid(const rte_mbuf *pkt) {
+bool check_if_tld_valid(const rte_mbuf *pkt) {
   std::string domain = get_domain_name(pkt);
 
   // Get TLD and make it uppercase
@@ -95,9 +94,29 @@ int check_if_tld_valid(const rte_mbuf *pkt) {
   return valid_tlds.find(tld) != valid_tlds.end();
 }
 
+int get_name_length(const rte_mbuf *pkt) {
+  // Skip headers
+  rte_ether_hdr *eth_hdr = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
+  rte_ipv4_hdr *ip_hdr = rte_pktmbuf_mtod_offset(pkt, rte_ipv4_hdr *,
+                                                 sizeof(struct rte_ether_hdr));
+  rte_udp_hdr *udp_hdr = (struct rte_udp_hdr *)((unsigned char *)ip_hdr +
+                                                sizeof(struct rte_ipv4_hdr));
+  char *qname = (char *)udp_hdr + sizeof(struct rte_udp_hdr) + 12;
+
+  int str_len = 0;
+
+  while (true) {
+    str_len++;
+    if (*qname == 0x0)
+      break;
+    qname++;
+  }
+  return str_len;
+}
+
 rte_mbuf *create_nxdomain_reply(const rte_mbuf *pkt) {
   rte_mbuf *ret_packet = (rte_mbuf *)rte_malloc(nullptr, sizeof(rte_mbuf), 0);
-  // Set up input headers
+  // Set up output headers
   rte_ether_hdr *out_eth_hdr =
       (rte_ether_hdr *)rte_pktmbuf_append(ret_packet, sizeof(rte_ether_hdr));
   rte_ipv4_hdr *out_ip_hdr =
@@ -105,12 +124,13 @@ rte_mbuf *create_nxdomain_reply(const rte_mbuf *pkt) {
   rte_udp_hdr *out_udp_hdr =
       (rte_udp_hdr *)rte_pktmbuf_append(ret_packet, sizeof(rte_udp_hdr));
 
-  // Set up output headers
+  // Set up input headers and data
   rte_ether_hdr *in_eth_hdr = rte_pktmbuf_mtod(pkt, rte_ether_hdr *);
   rte_ipv4_hdr *in_ip_hdr =
       rte_pktmbuf_mtod_offset(pkt, rte_ipv4_hdr *, sizeof(rte_ether_hdr));
   rte_udp_hdr *in_udp_hdr =
       (struct rte_udp_hdr *)((unsigned char *)in_ip_hdr + sizeof(rte_ipv4_hdr));
+  char *query = (char *)in_udp_hdr + sizeof(struct rte_udp_hdr);
 
   // Set up Ethernet header
   rte_memcpy(&out_eth_hdr, &in_eth_hdr, sizeof(out_eth_hdr));
@@ -134,8 +154,33 @@ rte_mbuf *create_nxdomain_reply(const rte_mbuf *pkt) {
              sizeof(out_udp_hdr->src_port));
   out_udp_hdr->dgram_cksum = 0; // Ignore UDP checksum
 
-  // Set UDP and IPv4 length
+  // Create DNS header
+  char *dns_hdr = rte_pktmbuf_append(ret_packet, 12);
+  rte_memcpy(dns_hdr, query, 2); // Copy over transaction ID
+  *(dns_hdr + 2) = 0b10000100;   // Standard query authoritative answer, no
+                                 // truncation or recursion
+  *(dns_hdr + 3) = 0b00000011;   // Name error
+  *(dns_hdr + 4) = 0x00;         // Original question
+  *(dns_hdr + 5) = 0b00000001;   // This is big endian
+  *(dns_hdr + 6) = 0x00;         // No answers
+  *(dns_hdr + 7) = 0x00;
+  *(dns_hdr + 8) = 0x00;         // No name server records
+  *(dns_hdr + 9) = 0x00;
+  *(dns_hdr + 10) = 0x00;        // No resource records
+  *(dns_hdr + 11) = 0x00;
 
+  // Copy domain name from input packet
+  char *qname = rte_pktmbuf_append(ret_packet, get_name_length(pkt) + 4);
+  char *in_qname = (char *)in_udp_hdr + sizeof(struct rte_udp_hdr) + 12;
+  rte_memcpy(qname, in_qname, get_name_length(pkt));
+
+  // Add type and class
+  char *ptr = qname + get_name_length(pkt);
+  char *in_ptr = in_qname + get_name_length(pkt);
+  rte_memcpy(ptr, in_ptr, 4);
+
+  // Set UDP and IPv4 length
+  
 
   // Set IPv4 checksum
   out_ip_hdr->hdr_checksum = 0;
