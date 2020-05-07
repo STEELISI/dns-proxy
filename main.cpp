@@ -270,7 +270,7 @@ static void worker_ingress(struct kni_port_params *p) {
 
   nb_kni = p->nb_kni;
   port_id = p->port_id;
-  for (i = 0; i < nb_kni; i++) {
+  for (int i = 0; i < nb_kni; i++) {
     int num = rte_ring_dequeue_burst(worker_rx_ring, (void **)buf, PKT_BURST_SZ,
                                      nullptr);
     if (unlikely(num > PKT_BURST_SZ)) {
@@ -280,10 +280,10 @@ static void worker_ingress(struct kni_port_params *p) {
 
     // Flag packets we can answer
     int bad_packets = 0;
-    for (uint32_t i = 0; i < num; i++) {
-      if (check_if_query(buf[i])) {
-        if (!check_if_tld_valid(buf[i])) {
-          good_packets[i] = false;
+    for (uint32_t it = 0; it < num; it++) {
+      if (check_if_query(buf[it])) {
+        if (!check_if_tld_valid(buf[it])) {
+          good_packets[it] = false;
           bad_packets++;
         }
       }
@@ -292,9 +292,9 @@ static void worker_ingress(struct kni_port_params *p) {
     // Pass bad packets to worker_egress
     struct rte_mbuf *bad_pkt_buf[16] __rte_cache_aligned;
     int counter = 0;
-    for (int i = 0; i < num; i++) {
-      if (!good_packets[i]) {
-        bad_pkt_buf[counter] = buf[i];
+    for (int it = 0; it < num; it++) {
+      if (!good_packets[it]) {
+        bad_pkt_buf[counter] = buf[it];
         counter++;
       }
     }
@@ -304,12 +304,14 @@ static void worker_ingress(struct kni_port_params *p) {
     // Pass good packets to KNI
     struct rte_mbuf *good_pkt_buf[16] __rte_cache_aligned;
     counter = 0;
-    for (int i = 0; i < num; i++) {
-      if (good_packets[i]) {
-        good_pkt_buf[counter] = buf[i];
+
+    for (int it = 0; it < num; it++) {
+      if (good_packets[it]) {
+        good_pkt_buf[counter] = buf[it];
         counter++;
       }
     }
+
     int good_packets = num - bad_packets;
     num = rte_kni_tx_burst(p->kni[i], good_pkt_buf, good_packets);
     if (num)
@@ -324,7 +326,7 @@ static void worker_ingress(struct kni_port_params *p) {
   }
 }
 
-// TODO: Read in invalid TLD packets and write to rte_eth_tx
+// TODO: Read in invalid TLD requests and write response to rte_eth_tx
 static void worker_egress(struct kni_port_params *p) {
   uint8_t i;
   uint16_t port_id;
@@ -340,7 +342,7 @@ static void worker_egress(struct kni_port_params *p) {
 
   int good_nums;
   for (i = 0; i < nb_kni; i++) {
-    /* Burst rx from kni */
+    // Burst rx from kni
     num = rte_ring_dequeue_burst(worker_tx_ring, (void **)pkts_burst,
                                  PKT_BURST_SZ, nullptr);
     if (unlikely(num > PKT_BURST_SZ)) {
@@ -348,12 +350,17 @@ static void worker_egress(struct kni_port_params *p) {
       return;
     }
 
-    /* Burst tx to eth */
+    // Create replies
+    for (int it = 0; it < num; it++) {
+    	create_nxdomain_reply(pkts_burst[i]);
+    }
+
+    // Burst tx to eth with replies
     nb_tx = rte_eth_tx_burst(port_id, 0, pkts_burst, (uint16_t)num);
     if (nb_tx)
       kni_stats[port_id].tx_packets += nb_tx;
     if (unlikely(nb_tx < num)) {
-      /* Free mbufs not tx to NIC */
+      // Free mbufs not tx to NIC
       kni_burst_free_mbufs(&pkts_burst[nb_tx], num - nb_tx);
       kni_stats[port_id].tx_dropped += num - nb_tx;
     }
