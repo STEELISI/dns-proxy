@@ -18,7 +18,7 @@ void create_nxdomain_reply(const rte_mbuf *pkt) {
       rte_pktmbuf_mtod_offset(pkt, rte_ipv4_hdr *, sizeof(rte_ether_hdr));
   rte_udp_hdr *udp_hdr =
       (struct rte_udp_hdr *)((unsigned char *)ip_hdr + sizeof(rte_ipv4_hdr));
-  char *query = (char *)udp_hdr + sizeof(struct rte_udp_hdr);
+  char *dns_hdr = (char *)udp_hdr + sizeof(struct rte_udp_hdr);
 
   // Set up Ethernet header
   auto temp_d_addr = eth_hdr->d_addr;
@@ -36,8 +36,7 @@ void create_nxdomain_reply(const rte_mbuf *pkt) {
   udp_hdr->src_port = temp_dst_port;
   udp_hdr->dgram_cksum = 0; // Ignore UDP checksum
 
-  // Modify DNS header
-  char *dns_hdr = query + 2;      // Copy over transaction ID
+  // Modify DNS headers
   *(dns_hdr + 2) |= 0b10000000;   // Standard query authoritative answer, no
                                   // truncation or recursion
   *(dns_hdr + 3) = 0b00000011;    // Name error
