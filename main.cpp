@@ -32,6 +32,7 @@
 #include <dpdk/rte_string_fns.h>
 
 #include "dns.h"
+#include "packet_builder.h"
 
 /* Macros for printing using RTE_LOG */
 #define RTE_LOGTYPE_APP RTE_LOGTYPE_USER1
