@@ -32,10 +32,4 @@ std::string get_domain_name(const rte_mbuf *pkt);
  */
 bool tld_setup();
 
-/**
- * Modfiy a packet to be an NXDOMAIN reply
- * @param buffer the input packet as a byte array
- */
-void create_nxdomain_reply(const rte_mbuf *pkt);
-
 #endif //DNS_PROXY__DNS_H
