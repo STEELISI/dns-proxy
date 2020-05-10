@@ -1,7 +1,3 @@
-/* SPDX-License-Identifier: BSD-3-Clause
- * Copyright(c) 2010-2014 Intel Corporation
- */
-
 #include <iostream>
 
 #include <errno.h>
@@ -238,19 +234,19 @@ static void kni_egress(struct kni_port_params *p) {
 
   int good_nums;
   for (i = 0; i < nb_kni; i++) {
-    /* Burst rx from kni */
+    // Burst rx from kni
     num = rte_kni_rx_burst(p->kni[i], pkts_burst, PKT_BURST_SZ);
     if (unlikely(num > PKT_BURST_SZ)) {
       RTE_LOG(ERR, APP, "Error receiving from KNI\n");
       return;
     }
 
-    /* Burst tx to eth */
+    // Burst tx to eth
     nb_tx = rte_eth_tx_burst(port_id, 0, pkts_burst, (uint16_t)num);
     if (nb_tx)
       kni_stats[port_id].tx_packets += nb_tx;
     if (unlikely(nb_tx < num)) {
-      /* Free mbufs not tx to NIC */
+      // Free mbufs not tx to NIC
       kni_burst_free_mbufs(&pkts_burst[nb_tx], num - nb_tx);
       kni_stats[port_id].tx_dropped += num - nb_tx;
     }
@@ -264,7 +260,6 @@ static void worker_ingress(struct kni_port_params *p) {
   uint16_t port_id;
   unsigned int num;
   uint32_t nb_kni;
-  bool good_packets[PKT_BURST_SZ] = {true};
 
   if (p == NULL)
     return;
@@ -272,6 +267,9 @@ static void worker_ingress(struct kni_port_params *p) {
   nb_kni = p->nb_kni;
   port_id = p->port_id;
   for (int i = 0; i < nb_kni; i++) {
+    // -1 is not set, 1 is NXDOMAIN, 0 is normal
+    int packet_status[PKT_BURST_SZ] = {-1};
+    // Burst RX from ring
     int num = rte_ring_dequeue_burst(worker_rx_ring, (void **)buf, PKT_BURST_SZ,
                                      nullptr);
     if (unlikely(num > PKT_BURST_SZ)) {
@@ -282,11 +280,11 @@ static void worker_ingress(struct kni_port_params *p) {
     // Flag packets we can answer
     int bad_packets = 0;
     for (uint32_t it = 0; it < num; it++) {
-      if (check_if_query(buf[it])) {
-        if (!check_if_tld_valid(buf[it])) {
-          good_packets[it] = false;
-          bad_packets++;
-        }
+      if (check_if_query(buf[it]) && !check_if_tld_valid(buf[it])) {
+        packet_status[it] = 1;
+        bad_packets++;
+      } else {
+        packet_status[it] = 0;
       }
     }
 
@@ -294,7 +292,7 @@ static void worker_ingress(struct kni_port_params *p) {
     struct rte_mbuf *bad_pkt_buf[16] __rte_cache_aligned;
     int counter = 0;
     for (int it = 0; it < num; it++) {
-      if (!good_packets[it]) {
+      if (packet_status[it] == 1) {
         bad_pkt_buf[counter] = buf[it];
         counter++;
       }
@@ -307,7 +305,7 @@ static void worker_ingress(struct kni_port_params *p) {
     counter = 0;
 
     for (int it = 0; it < num; it++) {
-      if (good_packets[it]) {
+      if (packet_status[it] == 0) {
         good_pkt_buf[counter] = buf[it];
         counter++;
       }
