@@ -18,5 +18,5 @@ make
 ```
 
 ## Running
-This program is based off DPDK's KNI example program, so EAL and command-line options will be the same. Note that CPUs `LCORE_TX + 1` and `LCORE_TX + 2` should also be assigned, and it must be run in the same directory as `tld.txt`.
+This program is based off DPDK's KNI example program, so EAL and command-line options will be the same. Note that CPUs `LCORE_WORKER_TX` and `LCORE_WORKER_TX` should also be assigned, and it must be run in the same directory as `tld.txt`.
 
