@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <iostream>
 
 #include <dpdk/rte_atomic.h>
 #include <dpdk/rte_branch_prediction.h>
@@ -273,7 +274,7 @@ static void worker_ingress(struct kni_port_params *p) {
   port_id = p->port_id;
   for (int i = 0; i < nb_kni; i++) {
     // -1 is not set, 1 is NXDOMAIN, 0 is normal
-    int packet_status[PKT_BURST_SZ] = {-1};
+    int8_t packet_status[PKT_BURST_SZ] = {-1};
     // Burst RX from ring
     unsigned int nb_rx = rte_ring_dequeue_burst(worker_rx_ring, (void **)buf,
                                                 PKT_BURST_SZ, nullptr);
@@ -285,16 +286,20 @@ static void worker_ingress(struct kni_port_params *p) {
     // Flag packets we can answer
     unsigned int bad_packets = 0;
     for (uint32_t it = 0; it < nb_rx; it++) {
-      if (check_if_query(buf[it]) && !check_if_tld_valid(buf[it])) {
-        packet_status[it] = 1;
-        bad_packets++;
+      if (check_if_query(buf[it])) {
+        if(!check_if_tld_valid(buf[it])) {
+          packet_status[it] = 1;
+          bad_packets++;
+        } else {
+          packet_status[it] = 0;
+        }
       } else {
         packet_status[it] = 0;
       }
     }
 
     // Pass bad packets to worker_egress
-    struct rte_mbuf *bad_pkt_buf[16] __rte_cache_aligned;
+    struct rte_mbuf *bad_pkt_buf[PKT_BURST_SZ] __rte_cache_aligned;
     unsigned int counter = 0;
     for (int it = 0; it < nb_rx; it++) {
       if (packet_status[it] == 1) {
@@ -302,6 +307,7 @@ static void worker_ingress(struct kni_port_params *p) {
         counter++;
       }
     }
+
     unsigned int num_bad_tx = rte_ring_enqueue_burst(
         worker_tx_ring, (void **)bad_pkt_buf, bad_packets, nullptr);
     if (unlikely(num_bad_tx < bad_packets)) {
@@ -311,7 +317,7 @@ static void worker_ingress(struct kni_port_params *p) {
     }
 
     // Pass good packets to KNI
-    struct rte_mbuf *good_pkt_buf[16] __rte_cache_aligned;
+    struct rte_mbuf *good_pkt_buf[PKT_BURST_SZ] __rte_cache_aligned;
     counter = 0;
 
     for (int it = 0; it < nb_rx; it++) {
