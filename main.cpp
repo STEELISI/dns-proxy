@@ -1,5 +1,3 @@
-#include <iostream>
-
 #include <errno.h>
 #include <getopt.h>
 #include <inttypes.h>
@@ -214,7 +212,8 @@ static void kni_ingress(struct kni_port_params *p) {
     }
 
     /* Burst rx to worker ring */
-    num = rte_ring_enqueue_burst(worker_rx_ring, (void **)pkts_burst, nb_rx, NULL);
+    num = rte_ring_enqueue_burst(worker_rx_ring, (void **)pkts_burst, nb_rx,
+                                 NULL);
     if (unlikely(num < nb_rx)) {
       // Free mbufs not tx to NIC
       kni_burst_free_mbufs(&pkts_burst[num], nb_rx - num);
@@ -277,7 +276,7 @@ static void worker_ingress(struct kni_port_params *p) {
     int packet_status[PKT_BURST_SZ] = {-1};
     // Burst RX from ring
     unsigned int nb_rx = rte_ring_dequeue_burst(worker_rx_ring, (void **)buf,
-                                              PKT_BURST_SZ, nullptr);
+                                                PKT_BURST_SZ, nullptr);
     if (unlikely(nb_rx > PKT_BURST_SZ)) {
       RTE_LOG(ERR, APP, "Error receiving from worker\n");
       return;
@@ -308,6 +307,7 @@ static void worker_ingress(struct kni_port_params *p) {
     if (unlikely(num_bad_tx < bad_packets)) {
       // Free mbufs not tx to ring interface
       kni_burst_free_mbufs(&bad_pkt_buf[num_bad_tx], bad_packets - num_bad_tx);
+      kni_stats[port_id].rx_dropped += bad_packets - num_bad_tx;
     }
 
     // Pass good packets to KNI
@@ -330,13 +330,14 @@ static void worker_ingress(struct kni_port_params *p) {
     rte_kni_handle_request(p->kni[i]);
     if (unlikely(num_good_tx < good_packets)) {
       // Free mbufs not tx to kni interface
-      kni_burst_free_mbufs(&good_pkt_buf[num_good_tx], good_packets - num_good_tx);
+      kni_burst_free_mbufs(&good_pkt_buf[num_good_tx],
+                           good_packets - num_good_tx);
       kni_stats[port_id].rx_dropped += good_packets - num_good_tx;
     }
   }
 }
 
-// TODO: Read in invalid TLD requests and write response to rte_eth_tx
+// Write invalid TLD responses to rte_eth_tx
 static void worker_egress(struct kni_port_params *p) {
   uint8_t i;
   uint16_t port_id;
