@@ -1,5 +1,5 @@
 # dns-proxy
-a DPDK dns proxy to catch bad NXDOMAIN requests
+a DPDK proxy to catch DNS requests with invalid TLDs before they reach the DNS server
 
 ## Requirements
 * [DPDK](https://dpdk.org) built with libpcap support
