@@ -80,11 +80,9 @@ std::string get_domain_name(const rte_mbuf *pkt) {
 }
 
 bool check_if_tld_valid(const rte_mbuf *pkt) {
-  std::string domain = get_domain_name(pkt);
+  std::string tld = get_domain_name(pkt);
 
   // Get TLD and make it uppercase
-  std::string tld =
-      domain.substr(domain.find_last_of('.') + 1, domain.length() - 1);
   std::for_each(tld.begin(), tld.end(), [](char &c) { c = std::toupper(c); });
 
   // Return true if the TLD is in valid_tlds

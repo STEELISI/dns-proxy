@@ -18,6 +18,8 @@ make
 ```
 
 ## Running
+Before running, remember to correctly set `local_ip` in `dns.cpp` to the IP address of your DNS server.
+
 This program is based off DPDK's KNI example program, so EAL and command-line options will be the same. Note that CPUs `LCORE_WORKER_TX` and `LCORE_WORKER_TX` should also be assigned, and it must be run in the same directory as `tld.txt`. For example, given a build in the `build` folder and a interface on 0000:04:00.0 bound to NUMA node 0, and 4 GB of hugepage memory:
 
 ```
