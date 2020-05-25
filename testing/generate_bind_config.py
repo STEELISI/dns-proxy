@@ -2,7 +2,7 @@
 import uuid
 import random
 
-# Generate a bind9 config with 100,000 random, valid TLD entries
+# Generate a bind9 config with 200,000 random, valid TLD entries
 # Also creates a dnsperf profile to fit it
 bind9_conf = open('/etc/bind/named.conf.default-zones', 'a')
 tld_list = open('tld_list.txt', 'a')
@@ -13,7 +13,7 @@ with open('tld.txt') as tld_file:
     tlds = [line.rstrip() for line in tld_file]
 
 # Generate random UUIDs as domain and add db entry
-for i in range(3, 100003):
+for i in range(3, 2000003):
     url = str(uuid.uuid4().hex) + '.' + random.choice(tlds)
     print(url)
 
