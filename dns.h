@@ -20,13 +20,6 @@ bool check_if_query(const rte_mbuf *pkt);
 bool check_if_tld_valid(const rte_mbuf *pkt);
 
 /**
- * Get the domain name from a packet
- * @param buffer the input packet as a byte array
- * @return the domain name as a cstring
- */
-std::string get_domain_name(const rte_mbuf *pkt);
-
-/**
  * Puts all values from `tld.txt` into the valid_tlds unordered_set
  * @return true if success
  */

@@ -10,8 +10,8 @@
 
 std::unordered_set<std::string> valid_tlds;
 
-// Local IP address, change as needed (currently 10.1.1.2)
-uint32_t local_ip = 0x0201010a;
+// Local IP address, change as needed (currently 10.1.1.1)
+uint32_t local_ip = 0x0101010a;
 
 bool check_if_query(const rte_mbuf *pkt) {
   rte_ether_hdr *eth_hdr = rte_pktmbuf_mtod(pkt, rte_ether_hdr *);
@@ -49,7 +49,7 @@ bool check_if_query(const rte_mbuf *pkt) {
   return (*qdcount_1 == 0 && *qdcount_2 == 1);
 }
 
-std::string get_domain_name(const rte_mbuf *pkt) {
+bool check_if_tld_valid(const rte_mbuf *pkt) {
   // Skip headers
   rte_ether_hdr *eth_hdr = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
   rte_ipv4_hdr *ip_hdr = rte_pktmbuf_mtod_offset(pkt, rte_ipv4_hdr *,
@@ -59,7 +59,7 @@ std::string get_domain_name(const rte_mbuf *pkt) {
   char *qname = (char *)udp_hdr + sizeof(struct rte_udp_hdr) + 12;
 
   // Loop until the end of the query name
-  std::string query;
+  std::string tld;
   int str_len, offset = 0;
   char *qname_start = qname;
 
@@ -74,40 +74,13 @@ std::string get_domain_name(const rte_mbuf *pkt) {
   }
 
   for (int i = offset + 1; i <= offset + str_len; i++)
-    query.push_back(*(qname_start + i));
-
-  return query;
-}
-
-bool check_if_tld_valid(const rte_mbuf *pkt) {
-  std::string tld = get_domain_name(pkt);
+    tld.push_back(*(qname_start + i));
 
   // Get TLD and make it uppercase
   std::for_each(tld.begin(), tld.end(), [](char &c) { c = std::toupper(c); });
 
   // Return true if the TLD is in valid_tlds
   return valid_tlds.find(tld) != valid_tlds.end();
-}
-
-int get_name_length(const rte_mbuf *pkt) {
-  // Skip headers
-  rte_ether_hdr *eth_hdr = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
-  rte_ipv4_hdr *ip_hdr = rte_pktmbuf_mtod_offset(pkt, rte_ipv4_hdr *,
-                                                 sizeof(struct rte_ether_hdr));
-  rte_udp_hdr *udp_hdr = (struct rte_udp_hdr *)((unsigned char *)ip_hdr +
-                                                sizeof(struct rte_ipv4_hdr));
-  char *qname = (char *)udp_hdr + sizeof(struct rte_udp_hdr) + 12;
-
-  int str_len = 0;
-
-  while (true) {
-    str_len++;
-    if (*qname == 0x0)
-      break;
-    qname++;
-  }
-
-  return str_len;
 }
 
 bool tld_setup() {

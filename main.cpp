@@ -1,13 +1,12 @@
-#include <errno.h>
+#include <cerrno>
 #include <getopt.h>
-#include <inttypes.h>
-#include <signal.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cinttypes>
+#include <csignal>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <unistd.h>
-#include <iostream>
 
 #include <dpdk/rte_atomic.h>
 #include <dpdk/rte_branch_prediction.h>
@@ -211,6 +210,7 @@ static void kni_ingress(struct kni_port_params *p) {
       RTE_LOG(ERR, APP, "Error receiving from eth\n");
       return;
     }
+    kni_stats[port_id].rx_packets += nb_rx;
 
     /* Burst rx to worker ring */
     num = rte_ring_enqueue_burst(worker_rx_ring, (void **)pkts_burst, nb_rx,
@@ -287,7 +287,7 @@ static void worker_ingress(struct kni_port_params *p) {
     unsigned int bad_packets = 0;
     for (uint32_t it = 0; it < nb_rx; it++) {
       if (check_if_query(buf[it])) {
-        if(!check_if_tld_valid(buf[it])) {
+        if (!check_if_tld_valid(buf[it])) {
           packet_status[it] = 1;
           bad_packets++;
         } else {
@@ -313,7 +313,6 @@ static void worker_ingress(struct kni_port_params *p) {
     if (unlikely(num_bad_tx < bad_packets)) {
       // Free mbufs not tx to ring interface
       kni_burst_free_mbufs(&bad_pkt_buf[num_bad_tx], bad_packets - num_bad_tx);
-      kni_stats[port_id].rx_dropped += bad_packets - num_bad_tx;
     }
 
     // Pass good packets to KNI
@@ -330,8 +329,6 @@ static void worker_ingress(struct kni_port_params *p) {
     int good_packets = nb_rx - bad_packets;
     unsigned int num_good_tx =
         rte_kni_tx_burst(p->kni[i], good_pkt_buf, good_packets);
-    if (num_good_tx)
-      kni_stats[port_id].rx_packets += num_good_tx;
 
     rte_kni_handle_request(p->kni[i]);
     if (unlikely(num_good_tx < good_packets)) {
