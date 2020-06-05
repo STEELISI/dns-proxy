@@ -1,5 +1,5 @@
 # dns-proxy
-a DPDK proxy to catch DNS requests with invalid TLDs before they reach the DNS server
+a DPDK KNI proxy to catch DNS requests with invalid TLDs before they reach the DNS server
 
 ## Requirements
 * [DPDK](https://dpdk.org) built with libpcap support
@@ -7,7 +7,9 @@ a DPDK proxy to catch DNS requests with invalid TLDs before they reach the DNS s
 * A CPU with SSSE3 support
 
 ## Compilation
-I've only tested compilation with GCC 9 and Intel C++ Compiler.
+I've only tested compilation with GCC 9 and ICC 2020.2. It may work on other compilers.
+
+DPDK was at version 19.11.2 when I tested it.
 
 Build with `cmake` by running:
 
