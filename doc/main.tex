@@ -56,7 +56,7 @@ The following results are from a dnsperf run using invalid TLDs. The run simulat
 Attack Traffic & With dns-proxy & Without dns-proxy \\
 \hline
 Queries sent & 600,000 & 600,000 \\
-Queries completed & 59,7829 & 600,000 \\
+Queries completed & 597,829 & 600,000 \\
 Queries lost & 2,171 & 0 \\
 Run time (s) & 107.773797 & 182.762914 \\
 Queries per second & 5,547.071892 & 3,282.941746 \\
@@ -88,6 +88,31 @@ Latency StdDev (s) & 0.003353 & 0.010643 \\
 \end{tabular}
 \end{center}
 
-To ensure that packets can be replied to at line rate, DPDK-pktgen was able to send all 600,000 packets at 1.3Mpps and record all 600,000 packets returned. \\
+To examine the performance of the program under heavy load, DPDK-pktgen was able to send all 600,000 packets at 25\% of line rate using this NIC and record all 600,000 packets returned. Given the line rate of 37Mpps, this application can handle around 9.25Mpps in this configuration. The following graph shows the performance of the application as the packet rate increases. \\
+
+\noindent
+\includegraphics[width=\textwidth]{performance.png}
+
+\section{Analysis}
+The runtime on dnsperf is not a good measure of actual run time if there is packet loss, since the penalty for a single lost packet is 5 seconds for the client. An easy way to ignore packet loss is to calculate for requests per second using the average latency instead, though this method does not account for the multiple clients that dnsperf simulates:
+
+\begin{center}
+\begin{tabular}{ ||c|c|c|| }
+\hline
+Configuration &  & Requests per second \\
+\hline
+Attack traffic with dns-proxy & 1/0.000097 & 10309.3 requests/s \\
+Attack traffic without dns-proxy & 1/0.030340 & 32.9598 requests/s \\
+Legitimate traffic with dns-proxy & 1/0.00373 & 268.097 requests/s \\
+Legitimate traffic without dns-proxy & 1/0.00254 & 393.701 requests/s \\
+\hline
+\end{tabular}
+\end{center}
+
+Answers to attack traffic without dns-proxy running is exceptionally slow as bind9 has to search through all of its records to see if any match for each request. Answers to attack traffic with dns-proxy running is extremely fast as all packet processing is done in DPDK, and the packet does not get copied to the virtual interface nor processed by bind9. \\
+
+DPDK-pktgen could not be run against a normal bind9 server, as it was unable to log any response packets. This is most likely due the kernel driver and bind9 not being able to respond quickly enough to the requests. \\
+
+The performance of dns-proxy against DPDK-pktgen shows that it is capable of replying to invalid TLD queries at a rate of 9.25 Mpps without packet loss on an Intel Xeon E5-2630 and an Intel X710 NIC, and at 11.1\% of line rate with under 10\% packet loss. As the hardware used in the experiment is 6 years old at the time of writing, performance should be better in more modern configurations with faster PCIe lanes, higher clock speeds, and more efficient NICs. \\
 
 \end{document}
