@@ -1,8 +1,8 @@
 #include "packet_builder.h"
 
-#include <dpdk/rte_ether.h>
-#include <dpdk/rte_ip.h>
-#include <dpdk/rte_udp.h>
+#include <rte_ether.h>
+#include <rte_ip.h>
+#include <rte_udp.h>
 
 void create_nxdomain_reply(const rte_mbuf *pkt) {
   // Set up headers and data

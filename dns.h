@@ -2,7 +2,7 @@
 #define DNS_PROXY__DNS_H
 
 #include <string>
-#include <dpdk/rte_mbuf.h>
+#include <rte_mbuf.h>
 
 /**
  * Check whether a packet is a standard QUERY

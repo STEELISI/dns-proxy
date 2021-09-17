@@ -2,7 +2,7 @@
 #define DNS_PROXY__PACKET_BUILDER_H
 
 #include <string>
-#include <dpdk/rte_mbuf.h>
+#include <rte_mbuf.h>
 
 /**
  * Modfiy a packet to be an NXDOMAIN reply

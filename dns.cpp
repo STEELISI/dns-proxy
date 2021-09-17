@@ -1,9 +1,9 @@
 #include "dns.h"
 
 #include <algorithm>
-#include <dpdk/rte_ether.h>
-#include <dpdk/rte_ip.h>
-#include <dpdk/rte_udp.h>
+#include <rte_ether.h>
+#include <rte_ip.h>
+#include <rte_udp.h>
 #include <fstream>
 #include <netinet/in.h>
 #include <unordered_set>
